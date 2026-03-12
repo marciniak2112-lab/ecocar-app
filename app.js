@@ -102,10 +102,10 @@ function renderCars(filter = '') {
     }
 
     carsGrid.innerHTML = filteredCars.map(car => `
-        <div class="car-card" data-id="${car.id}">
+        <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
             <h3>${car.brand}</h3>
             <div class="car-info-row">
-                <span class="label">Cena</span>
+                <span class="label">Wartość Usługi</span>
                 <span class="val">${formatCurrency(car.price)}</span>
             </div>
             <div class="car-info-row">
@@ -159,6 +159,10 @@ function updateStats() {
     totalCarsEl.textContent = cars.length;
     const totalValue = cars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     totalValueEl.textContent = formatCurrency(totalValue);
+
+    // Update label in stats too if needed
+    const valLabel = document.querySelector('.stats-overview .stat-card:last-child .label');
+    if (valLabel) valLabel.textContent = 'Łączna Wartość Usług';
 }
 
 // Helpers
@@ -171,8 +175,9 @@ addCarBtn.addEventListener('click', () => {
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
     document.getElementById('car-id').value = '';
-    // Clear checkboxes explicitly since reset() might not handle all UI states if customized
+    // Clear checkboxes explicitly
     document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
+    document.getElementById('car-priority').checked = false;
     carModal.classList.add('active');
 });
 
@@ -200,6 +205,7 @@ carForm.addEventListener('submit', async (e) => {
         history: document.getElementById('car-history').value,
         worker: document.getElementById('car-worker').value,
         todo: todoList,
+        priority: document.getElementById('car-priority').checked,
         dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString()
     };
 
@@ -238,6 +244,7 @@ function editCar(id) {
         document.getElementById('car-owner-phone').value = car.ownerPhone;
         document.getElementById('car-history').value = car.history;
         document.getElementById('car-worker').value = car.worker || '';
+        document.getElementById('car-priority').checked = car.priority || false;
 
         // Reset and set checkboxes
         document.querySelectorAll('input[name="todo"]').forEach(cb => {

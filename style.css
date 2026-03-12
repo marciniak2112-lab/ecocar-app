@@ -537,3 +537,45 @@ header {
     border-radius: 50%;
     display: inline-block;
 }
+
+/* Priority Styles */
+.car-card.priority-high {
+    border: 2px solid #ff4b2b;
+    box-shadow: 0 0 20px rgba(255, 75, 43, 0.2);
+    background: rgba(255, 75, 43, 0.03);
+}
+
+.car-card.priority-high h3 {
+    color: #ff4b2b;
+}
+
+.car-card.priority-high .todo-bullet {
+    background: #ff4b2b;
+}
+
+.car-card.priority-high .todo-list-preview {
+    border-left-color: #ff4b2b;
+}
+
+.car-card.priority-high .todo-list-preview .label {
+    color: #ff4b2b;
+}
+
+.priority-toggle {
+    margin-top: 10px;
+    font-weight: 600;
+    color: #ff4b2b !important;
+}
+
+.priority-checkmark {
+    border-color: rgba(255, 75, 43, 0.4);
+}
+
+.checkbox-container:hover input~.priority-checkmark {
+    border-color: #ff4b2b;
+}
+
+.checkbox-container input:checked~.priority-checkmark {
+    background-color: #ff4b2b;
+    border-color: #ff4b2b;
+}
