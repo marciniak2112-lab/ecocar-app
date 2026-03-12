@@ -199,6 +199,34 @@ function renderArchiveGrouped(filteredCars) {
     carsGrid.innerHTML = html;
 }
 
+function updateCountdowns() {
+    document.querySelectorAll('.countdown-timer').forEach(el => {
+        const pickupStr = el.dataset.pickup;
+        if (!pickupStr) return;
+
+        // Assume pick-up is by the end of the day
+        const pickupDate = new Date(pickupStr + 'T23:59:59');
+        const now = new Date();
+        const diff = pickupDate - now;
+
+        if (diff < 0) {
+            el.innerHTML = '<span class="expired">⌛ Czas upłynął!</span>';
+            return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let timeStr = '';
+        if (days > 0) timeStr += `${days}d `;
+        timeStr += `${hours}h ${minutes}m ${seconds}s`;
+
+        el.innerHTML = `⌛ Pozostało: ${timeStr}`;
+    });
+}
+
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
     return `
@@ -207,6 +235,9 @@ function generateCarCardHtml(car) {
                 ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
                 ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}</span>` : ''}
             </div>
+            
+            ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
+
             <h3>${car.brand}</h3>
             <div class="car-info-row">
                 <span class="label">Wartość Usługi</span>

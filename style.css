@@ -760,6 +760,33 @@ header {
     flex-wrap: wrap;
 }
 
+.countdown-timer {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin: 12px 0;
+    padding: 10px;
+    background: rgba(57, 255, 20, 0.05);
+    border-radius: 10px;
+    border: 1px dashed var(--border-color);
+    text-align: center;
+    box-shadow: inset 0 0 10px rgba(57, 255, 20, 0.05);
+}
+
+.countdown-timer .expired {
+    color: #ff4b2b;
+}
+
+.priority-high .countdown-timer {
+    border-color: rgba(255, 75, 43, 0.4);
+    background: rgba(255, 75, 43, 0.05);
+}
+
+.priority-high .countdown-timer:not(.expired) {
+    color: #ff4b2b;
+}
+
 /* Toast Notifications */
 #toast-container {
     position: fixed;
