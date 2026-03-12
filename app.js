@@ -149,11 +149,13 @@ function init() {
                 } catch (e) { console.error("Update login error", e); }
             }
             logAction(`Zalogowano użytkownika: ${currentUser}`);
+            updateUIForRole();
             renderCars(); // Re-render to apply permissions
         } else {
             showToast("Błędne hasło lub użytkownik", "error");
         }
     };
+    updateUIForRole();
 }
 
 async function logAction(actionText) {
@@ -163,6 +165,18 @@ async function logAction(actionText) {
             timestamp: new Date().toISOString()
         });
     } catch (e) { console.error("Log error", e); }
+}
+
+function updateUIForRole() {
+    if (currentUser === 'Admin') {
+        viewAdminBtn.style.display = 'block';
+    } else {
+        viewAdminBtn.style.display = 'none';
+        // If current view is admin and user is not admin, switch to active
+        if (currentView === 'admin') {
+            viewActiveBtn.click();
+        }
+    }
 }
 
 async function loadAdminData() {
@@ -513,6 +527,7 @@ logoutBtn.addEventListener('click', () => {
     appContainer.style.display = 'none';
     loginOverlay.style.display = 'flex';
     loggedUserNameEl.textContent = 'Gość';
+    updateUIForRole();
     showToast("Wylogowano pomyślnie", "info");
 });
 
