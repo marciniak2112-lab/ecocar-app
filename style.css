@@ -197,6 +197,102 @@ header {
     gap: 1.5rem;
 }
 
+/* Switch to Row View for Archive */
+.cars-grid.list-view {
+    display: block !important;
+}
+
+.archive-container {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.archive-header {
+    display: flex;
+    padding: 12px 20px;
+    margin-bottom: 15px;
+    font-weight: 700;
+    color: var(--primary-green);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    border-bottom: 2px solid rgba(57, 255, 20, 0.2);
+}
+
+.archive-row {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.archive-row:hover {
+    transform: translateX(5px);
+    border-color: var(--primary-green);
+    background: rgba(57, 255, 20, 0.05) !important;
+}
+
+.archive-row .col {
+    flex: 1;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.archive-row .col.owner {
+    flex: 1.5;
+    font-weight: 600;
+}
+
+.archive-row .col.brand {
+    flex: 2;
+}
+
+.archive-row .col.plates {
+    flex: 1;
+    color: var(--primary-green);
+    font-family: monospace;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.archive-row .col.date {
+    flex: 1;
+    color: var(--text-muted);
+}
+
+.archive-row .col.actions {
+    flex: 0.5;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .archive-header {
+        display: none;
+    }
+
+    .archive-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 20px;
+    }
+
+    .archive-row .col {
+        width: 100%;
+    }
+
+    .archive-row .col.actions {
+        justify-content: flex-start;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+}
+
 .car-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);

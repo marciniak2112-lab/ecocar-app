@@ -286,6 +286,7 @@ function renderCars(filter = '') {
     // Apply text filter
     filteredCars = filteredCars.filter(car =>
         (car.brand || '').toLowerCase().includes(searchTerm) ||
+        (car.plateNum || '').toLowerCase().includes(searchTerm) ||
         (car.ownerPhone || '').includes(searchTerm) ||
         (car.history || '').toLowerCase().includes(searchTerm) ||
         (car.worker || '').toLowerCase().includes(searchTerm) ||
@@ -302,7 +303,7 @@ function renderCars(filter = '') {
     }
 
     if (currentView === 'archive') {
-        renderArchiveGrouped(filteredCars);
+        renderArchiveRows(filteredCars);
     } else {
         renderActiveGrid(filteredCars);
     }
@@ -311,30 +312,51 @@ function renderCars(filter = '') {
     attachCardListeners();
 }
 
-function renderActiveGrid(filteredCars) {
-    carsGrid.innerHTML = filteredCars.map(car => generateCarCardHtml(car)).join('');
-}
+function renderArchiveRows(filteredCars) {
+    const sorted = [...filteredCars].sort((a, b) => new Date(b.statusChangeDate || b.dateAdded) - new Date(a.statusChangeDate || b.dateAdded));
 
-function renderArchiveGrouped(filteredCars) {
-    // Sort archived cars by modified date (completion date) or added date
-    const sorted = [...filteredCars].sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-
-    let html = '';
-    let lastDate = null;
+    let html = `
+        <div class="archive-container">
+            <div class="archive-header glass">
+                <span class="col owner">Właściciel / Tel</span>
+                <span class="col brand">Marka i Model</span>
+                <span class="col plates">Tablice</span>
+                <span class="col date">Data wydania</span>
+                ${currentUser === 'Admin' ? '<span class="col actions">Akcje</span>' : ''}
+            </div>
+            <div class="archive-list">
+    `;
 
     sorted.forEach(car => {
-        const carDate = new Date(car.dateAdded).toLocaleDateString();
-        const today = new Date().toLocaleDateString();
-
-        if (carDate !== lastDate) {
-            const dateLabel = carDate === today ? 'Dzisiaj' : carDate;
-            html += `<div class="date-separator"><span>${dateLabel}</span></div>`;
-            lastDate = carDate;
-        }
-        html += generateCarCardHtml(car);
+        const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : '---';
+        html += `
+            <div class="archive-row glass" data-id="${car.id}">
+                <span class="col owner">${car.ownerPhone}</span>
+                <span class="col brand">${car.brand}</span>
+                <span class="col plates">${car.plateNum || '---'}</span>
+                <span class="col date">${releaseDate}</span>
+                ${currentUser === 'Admin' ? `
+                <span class="col actions">
+                    <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </span>
+                ` : ''}
+            </div>
+        `;
     });
 
+    html += '</div></div>';
     carsGrid.innerHTML = html;
+    carsGrid.classList.add('list-view');
+}
+
+function renderActiveGrid(filteredCars) {
+    carsGrid.classList.remove('list-view');
+    carsGrid.innerHTML = filteredCars.map(car => generateCarCardHtml(car)).join('');
 }
 
 function updateCountdowns() {
@@ -376,6 +398,7 @@ function generateCarCardHtml(car) {
             
             ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
 
+            ${car.plateNum ? `<div class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum}</div>` : ''}
             <h3>${car.brand}</h3>
             <div class="car-info-row">
                 <span class="label">Wartość Usługi</span>
@@ -466,7 +489,8 @@ async function archiveCar(id) {
         try {
             await updateDoc(doc(db, 'cars', id), {
                 archived: true,
-                status: 'gotowe'
+                status: 'gotowe',
+                statusChangeDate: new Date().toISOString()
             });
             showToast("Zarchiwizowano pojazd", "success");
             logAction(`Zarchiwizowano auto: ${car ? car.brand : 'nieznane'}`);
@@ -554,6 +578,7 @@ carForm.addEventListener('submit', async (e) => {
 
     const carData = {
         brand: document.getElementById('car-brand').value,
+        plateNum: document.getElementById('car-plate').value,
         price: parseFloat(document.getElementById('car-price').value) || 0,
         ownerPhone: document.getElementById('car-owner-phone').value,
         history: document.getElementById('car-history').value,
@@ -608,6 +633,7 @@ function editCar(id) {
         modalTitle.textContent = 'Edytuj Samochód';
         document.getElementById('car-id').value = car.id;
         document.getElementById('car-brand').value = car.brand;
+        document.getElementById('car-plate').value = car.plateNum || '';
         document.getElementById('car-price').value = car.price;
         document.getElementById('car-owner-phone').value = car.ownerPhone;
         document.getElementById('car-history').value = car.history;
