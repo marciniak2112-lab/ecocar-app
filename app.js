@@ -382,11 +382,7 @@ function generateCarCardHtml(car) {
                 </button>
                 ` : ''}
 
-                ${!car.archived ? `
-                <button class="btn-icon btn-archive" data-id="${car.id}" title="Archiwizuj">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-                </button>
-                ` : ''}
+
             </div>
 
             ${!car.archived ? `
@@ -395,6 +391,13 @@ function generateCarCardHtml(car) {
                 <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
                 <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
             </div>
+            ${!car.archived ? `
+            <div style="margin-top: 10px;">
+                <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(255, 255, 255, 0.05); border-color: var(--text-muted); color: var(--text-muted);">
+                    📁 Przenieś do archiwum
+                </button>
+            </div>
+            ` : ''}
             ` : ''}
         </div>
     `;
