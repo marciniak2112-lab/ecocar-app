@@ -10,7 +10,10 @@ import {
     orderBy,
     doc,
     deleteDoc,
-    updateDoc
+    updateDoc,
+    setDoc,
+    limit,
+    getDoc
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 // Your web app's Firebase configuration
@@ -56,9 +59,20 @@ const confirmModal = document.getElementById('confirm-modal');
 const confirmOkBtn = document.getElementById('confirm-ok');
 const confirmCancelBtn = document.getElementById('confirm-cancel');
 const confirmMessageEl = document.getElementById('confirm-message');
+const loginOverlay = document.getElementById('login-overlay');
+const loginForm = document.getElementById('login-form');
+const adminPanelBtn = document.getElementById('admin-panel-btn');
+const adminModal = document.getElementById('admin-modal');
+const closeAdminModalBtn = document.getElementById('close-admin-modal');
+const tomekLoginEl = document.getElementById('tomek-last-login');
+const activityLogEl = document.getElementById('activity-log');
+const logoutBtn = document.getElementById('logout-btn');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
+    // Check Session
+    checkAuth();
+
     // Theme setup
     const savedTheme = localStorage.getItem('ecoCarTheme') || 'dark';
     applyTheme(savedTheme);
@@ -70,6 +84,8 @@ function init() {
         renderCars();
         updateStats();
     });
+
+    setInterval(updateCountdowns, 1000);
 
     // View Switching
     viewActiveBtn.onclick = () => {
@@ -334,6 +350,8 @@ async function updateCarStatus(id, newStatus) {
             status: newStatus,
             statusChangeDate: new Date().toISOString()
         });
+        const car = cars.find(c => c.id === id);
+        logActivity(`Zmieniono status na ${newStatus}`, car ? car.brand : 'Nieznany');
         showToast(`Zmieniono status na: ${newStatus}`, 'success');
     } catch (e) {
         showToast("Błąd przy zmianie statusu", "error");
@@ -375,7 +393,104 @@ window.onclick = (event) => {
     if (event.target === carModal) carModal.classList.remove('active');
     if (event.target === helpModal) helpModal.classList.remove('active');
     if (event.target === confirmModal) confirmModal.classList.remove('active');
+    if (event.target === adminModal) adminModal.classList.remove('active');
 };
+
+loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const user = document.getElementById('login-user').value;
+    const pass = document.getElementById('login-pass').value;
+    login(user, pass);
+});
+
+adminPanelBtn.addEventListener('click', () => {
+    adminModal.classList.add('active');
+    loadAdminData();
+});
+
+closeAdminModalBtn.addEventListener('click', () => {
+    adminModal.classList.remove('active');
+});
+
+logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('ecoCarUser');
+    location.reload();
+});
+
+function checkAuth() {
+    const user = JSON.parse(localStorage.getItem('ecoCarUser'));
+    if (!user) {
+        loginOverlay.style.display = 'flex';
+    } else {
+        loginOverlay.style.display = 'none';
+        if (user.role === 'Admin') {
+            document.body.classList.add('user-admin');
+        }
+    }
+}
+
+async function login(username, password) {
+    if (username === 'Admin' && password === 'system02') {
+        const userData = { name: 'Admin', role: 'Admin' };
+        localStorage.setItem('ecoCarUser', JSON.stringify(userData));
+        location.reload();
+    } else if (username === 'Tomek') {
+        if (password === 'qazwsx') {
+            const userData = { name: 'Tomek', role: 'User' };
+            localStorage.setItem('ecoCarUser', JSON.stringify(userData));
+            try {
+                await setDoc(doc(db, 'system', 'stats'), {
+                    tomekLastLogin: new Date().toISOString()
+                }, { merge: true });
+                location.reload();
+            } catch (e) {
+                console.error("Error logging login:", e);
+                location.reload();
+            }
+        } else {
+            showToast("Błędne hasło dla Tomka", "error");
+        }
+    } else {
+        showToast("Błędne poświadczenia", "error");
+    }
+}
+
+async function logActivity(action, carBrand) {
+    const user = JSON.parse(localStorage.getItem('ecoCarUser'));
+    const userName = user ? user.name : 'Unknown';
+    try {
+        await addDoc(collection(db, 'logs'), {
+            user: userName,
+            action: action,
+            car: carBrand,
+            timestamp: new Date().toISOString()
+        });
+    } catch (e) {
+        console.error("Logging error:", e);
+    }
+}
+
+async function loadAdminData() {
+    const statsDoc = await getDoc(doc(db, 'system', 'stats'));
+    if (statsDoc.exists()) {
+        const data = statsDoc.data();
+        if (data.tomekLastLogin) {
+            tomekLoginEl.textContent = new Date(data.tomekLastLogin).toLocaleString('pl-PL');
+        }
+    }
+
+    const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(10));
+    const querySnapshot = await getDocs(q);
+    activityLogEl.innerHTML = querySnapshot.docs.map(doc => {
+        const log = doc.data();
+        return `
+            <div class="log-item">
+                <span class="log-date">${new Date(log.timestamp).toLocaleString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</span>
+                <strong>${log.user}</strong>: ${log.action} <em>${log.car}</em>
+            </div>
+        `;
+    }).join('') || '<div class="log-item">Brak aktywności.</div>';
+}
 
 helpBtn.addEventListener('click', () => {
     helpModal.classList.add('active');
@@ -410,9 +525,11 @@ carForm.addEventListener('submit', async (e) => {
     try {
         if (id) {
             await updateDoc(doc(db, 'cars', id), carData);
+            logActivity('Zaktualizowano', carData.brand);
             showToast("Zaktualizowano dane", "success");
         } else {
             await addDoc(carsCol, carData);
+            logActivity('Dodano', carData.brand);
             showToast("Dodano nowe auto", "success");
         }
         carModal.classList.remove('active');
@@ -425,7 +542,9 @@ async function deleteCar(id) {
     const confirmed = await showConfirm('Czy na pewno chcesz usunąć ten samochód? Operacja jest nieodwracalna.');
     if (confirmed) {
         try {
+            const car = cars.find(c => c.id === id);
             await deleteDoc(doc(db, 'cars', id));
+            logActivity('Usunięto', car ? car.brand : 'Nieznany');
             showToast("Usunięto samochód", "success");
         } catch (error) {
             showToast("Błąd usuwania", "error");
