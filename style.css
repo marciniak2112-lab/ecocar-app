@@ -737,8 +737,23 @@ header {
     display: block;
     font-size: 0.75rem;
     color: #ffc107;
-    margin-bottom: 4px;
     font-weight: 600;
+}
+
+.pickup-date-tag {
+    display: block;
+    font-size: 0.75rem;
+    color: #00d4ff;
+    font-weight: 600;
+}
+
+.dates-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 /* Toast Notifications */

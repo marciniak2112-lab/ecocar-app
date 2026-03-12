@@ -203,7 +203,10 @@ function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
     return `
         <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
-            ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
+            <div class="dates-row">
+                ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
+                ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}</span>` : ''}
+            </div>
             <h3>${car.brand}</h3>
             <div class="car-info-row">
                 <span class="label">Wartość Usługi</span>
@@ -329,6 +332,7 @@ carForm.addEventListener('submit', async (e) => {
         history: document.getElementById('car-history').value,
         worker: document.getElementById('car-worker').value,
         arrivalDate: document.getElementById('car-arrival-date').value,
+        pickupDate: document.getElementById('car-pickup-date').value,
         todo: todoList,
         priority: document.getElementById('car-priority').checked,
         archived: id ? (cars.find(c => c.id === id).archived || false) : false,
@@ -372,6 +376,7 @@ function editCar(id) {
         document.getElementById('car-history').value = car.history;
         document.getElementById('car-worker').value = car.worker || '';
         document.getElementById('car-arrival-date').value = car.arrivalDate || '';
+        document.getElementById('car-pickup-date').value = car.pickupDate || '';
         document.getElementById('car-priority').checked = car.priority || false;
 
         // Reset and set checkboxes
