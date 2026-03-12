@@ -69,6 +69,8 @@ const confirmOkBtn = document.getElementById('confirm-ok');
 const confirmCancelBtn = document.getElementById('confirm-cancel');
 const confirmMessageEl = document.getElementById('confirm-message');
 const appContainer = document.getElementById('app');
+const loggedUserNameEl = document.getElementById('logged-user-name');
+const logoutBtn = document.getElementById('logout-btn');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -127,6 +129,7 @@ function init() {
             currentUser = user;
             loginOverlay.style.display = 'none';
             appContainer.style.display = 'block';
+            loggedUserNameEl.textContent = user;
             showToast(`Zalogowano jako ${user}`, "success");
             loginPassInput.value = ''; // Clear password
 
@@ -493,6 +496,14 @@ helpBtn.addEventListener('click', () => {
 
 closeHelpModalBtn.addEventListener('click', () => {
     helpModal.classList.remove('active');
+});
+
+logoutBtn.addEventListener('click', () => {
+    currentUser = '';
+    appContainer.style.display = 'none';
+    loginOverlay.style.display = 'flex';
+    loggedUserNameEl.textContent = 'Gość';
+    showToast("Wylogowano pomyślnie", "info");
 });
 
 carForm.addEventListener('submit', async (e) => {

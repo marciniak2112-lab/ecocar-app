@@ -1015,6 +1015,36 @@ header {
     font-size: 0.8rem;
 }
 
+/* User Pill */
+.user-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+.user-pill #logged-user-name {
+    color: var(--primary-green);
+    border-right: 1px solid var(--border-color);
+    padding-right: 10px;
+}
+
+.user-pill .btn-icon {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+}
+
+.user-pill .btn-icon:hover {
+    color: #ff4b2b;
+}
+
 @media (max-width: 600px) {
     #toast-container {
         bottom: 12px;
