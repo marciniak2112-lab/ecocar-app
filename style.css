@@ -579,3 +579,108 @@ header {
     background-color: #ff4b2b;
     border-color: #ff4b2b;
 }
+
+/* Priority Exclamation Mark */
+.priority-high::after {
+    content: '!';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ff4b2b;
+    color: white;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-weight: 800;
+    font-size: 16px;
+    box-shadow: 0 0 10px rgba(255, 75, 43, 0.5);
+    z-index: 10;
+}
+
+/* Tabs styles */
+.view-tabs {
+    display: flex;
+    background: var(--input-bg);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 6px 16px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    background: var(--primary-green);
+    color: black;
+}
+
+.tab-btn:hover:not(.active) {
+    color: var(--primary-green);
+}
+
+/* Archive Separator */
+.date-separator {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 2rem 0 1rem;
+}
+
+.date-separator span {
+    font-weight: 700;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.date-separator::after {
+    content: '';
+    flex-grow: 1;
+    height: 1px;
+    background: var(--border-color);
+    opacity: 0.5;
+}
+
+.btn-done {
+    background: transparent;
+    border: 1px solid var(--primary-green);
+    color: var(--primary-green);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-left: auto;
+}
+
+.btn-done:hover {
+    background: var(--primary-green);
+    color: black;
+}
+
+.priority-high .btn-done {
+    border-color: #ff4b2b;
+    color: #ff4b2b;
+}
+
+.priority-high .btn-done:hover {
+    background: #ff4b2b;
+    color: white;
+}

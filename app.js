@@ -32,6 +32,7 @@ const carsCol = collection(db, 'cars');
 
 // State Management
 let cars = [];
+let currentView = 'active'; // 'active' or 'archive'
 
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
@@ -46,6 +47,8 @@ const modalTitle = document.getElementById('modal-title');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const sunIcon = document.getElementById('sun-icon');
 const moonIcon = document.getElementById('moon-icon');
+const viewActiveBtn = document.getElementById('view-active');
+const viewArchiveBtn = document.getElementById('view-archive');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -59,6 +62,21 @@ function init() {
         renderCars();
         updateStats();
     });
+
+    // View Switching
+    viewActiveBtn.onclick = () => {
+        currentView = 'active';
+        viewActiveBtn.classList.add('active');
+        viewArchiveBtn.classList.remove('active');
+        renderCars(searchInput.value);
+    };
+
+    viewArchiveBtn.onclick = () => {
+        currentView = 'archive';
+        viewArchiveBtn.classList.add('active');
+        viewActiveBtn.classList.remove('active');
+        renderCars(searchInput.value);
+    };
 }
 
 function applyTheme(theme) {
@@ -84,7 +102,15 @@ themeToggleBtn.addEventListener('click', () => {
 // Render UI
 function renderCars(filter = '') {
     const searchTerm = filter.toLowerCase();
-    const filteredCars = cars.filter(car =>
+
+    // Filter by view state (active vs archive)
+    let filteredCars = cars.filter(car => {
+        const isArchived = car.archived === true;
+        return currentView === 'active' ? !isArchived : isArchived;
+    });
+
+    // Apply text filter
+    filteredCars = filteredCars.filter(car =>
         (car.brand || '').toLowerCase().includes(searchTerm) ||
         (car.ownerPhone || '').includes(searchTerm) ||
         (car.history || '').toLowerCase().includes(searchTerm) ||
@@ -95,13 +121,50 @@ function renderCars(filter = '') {
     if (filteredCars.length === 0) {
         carsGrid.innerHTML = `
             <div class="empty-state">
-                <p>${filter ? 'Nie znaleziono samochodów pasujących do wyszukiwania.' : 'Brak samochodów w systemie. Kliknij "Dodaj Auto", aby zacząć.'}</p>
+                <p>${filter ? 'Nie znaleziono samochodów.' : (currentView === 'active' ? 'Brak aktywnych zleceń.' : 'Archiwum jest puste.')}</p>
             </div>
         `;
         return;
     }
 
-    carsGrid.innerHTML = filteredCars.map(car => `
+    if (currentView === 'archive') {
+        renderArchiveGrouped(filteredCars);
+    } else {
+        renderActiveGrid(filteredCars);
+    }
+
+    // Attach event listeners to new buttons
+    attachCardListeners();
+}
+
+function renderActiveGrid(filteredCars) {
+    carsGrid.innerHTML = filteredCars.map(car => generateCarCardHtml(car)).join('');
+}
+
+function renderArchiveGrouped(filteredCars) {
+    // Sort archived cars by modified date (completion date) or added date
+    const sorted = [...filteredCars].sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+
+    let html = '';
+    let lastDate = null;
+
+    sorted.forEach(car => {
+        const carDate = new Date(car.dateAdded).toLocaleDateString();
+        const today = new Date().toLocaleDateString();
+
+        if (carDate !== lastDate) {
+            const dateLabel = carDate === today ? 'Dzisiaj' : carDate;
+            html += `<div class="date-separator"><span>${dateLabel}</span></div>`;
+            lastDate = carDate;
+        }
+        html += generateCarCardHtml(car);
+    });
+
+    carsGrid.innerHTML = html;
+}
+
+function generateCarCardHtml(car) {
+    return `
         <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
             <h3>${car.brand}</h3>
             <div class="car-info-row">
@@ -138,12 +201,10 @@ function renderCars(filter = '') {
                 <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
+                ${!car.archived ? `<button class="btn-done" data-id="${car.id}">Gotowe</button>` : ''}
             </div>
         </div>
-    `).join('');
-
-    // Attach event listeners to new buttons
-    attachCardListeners();
+    `;
 }
 
 function attachCardListeners() {
@@ -153,16 +214,20 @@ function attachCardListeners() {
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.onclick = () => deleteCar(btn.dataset.id);
     });
+    document.querySelectorAll('.btn-done').forEach(btn => {
+        btn.onclick = () => markAsDone(btn.dataset.id);
+    });
 }
 
 function updateStats() {
-    totalCarsEl.textContent = cars.length;
-    const totalValue = cars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
+    const activeCars = cars.filter(c => !c.archived);
+    totalCarsEl.textContent = activeCars.length;
+    const totalValue = activeCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     totalValueEl.textContent = formatCurrency(totalValue);
 
     // Update label in stats too if needed
     const valLabel = document.querySelector('.stats-overview .stat-card:last-child .label');
-    if (valLabel) valLabel.textContent = 'Łączna Wartość Usług';
+    if (valLabel) valLabel.textContent = 'Aktywna Wartość Usług';
 }
 
 // Helpers
@@ -206,6 +271,7 @@ carForm.addEventListener('submit', async (e) => {
         worker: document.getElementById('car-worker').value,
         todo: todoList,
         priority: document.getElementById('car-priority').checked,
+        archived: id ? (cars.find(c => c.id === id).archived || false) : false,
         dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString()
     };
 
@@ -231,6 +297,20 @@ async function deleteCar(id) {
             console.error("Error deleting car: ", error);
             alert("Błąd podczas usuwania.");
         }
+    }
+}
+
+async function markAsDone(id) {
+    try {
+        const carRef = doc(db, 'cars', id);
+        // We update the dateAdded to NOW so it appears first in archive for the date it was completed
+        await updateDoc(carRef, {
+            archived: true,
+            dateAdded: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error archiving car: ", error);
+        alert("Błąd podczas archiwizacji.");
     }
 }
 
