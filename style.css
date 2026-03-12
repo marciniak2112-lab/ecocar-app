@@ -208,6 +208,9 @@ header {
     position: relative;
     overflow: hidden;
     box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    min-height: 420px;
 }
 
 .car-card:hover {
@@ -692,7 +695,7 @@ header {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
-    margin-top: 1rem;
+    margin-top: auto;
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
 }
@@ -700,14 +703,15 @@ header {
 .btn-status {
     border: 1px solid var(--border-color);
     background: var(--input-bg);
-    color: var(--text-muted);
-    padding: 6px 4px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    color: var(--text-main);
+    padding: 10px 4px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
     cursor: pointer;
     transition: 0.3s;
     text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-status:hover {

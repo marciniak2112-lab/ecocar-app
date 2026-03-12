@@ -233,16 +233,8 @@ function generateCarCardHtml(car) {
             ` : ''}
 
             <div class="car-history-preview">
-                <p><strong>Wykonano:</strong><br>${car.history || 'Brak wpisów'}</p>
+                <p><strong>Uwagi:</strong><br>${car.history || 'Brak uwag'}</p>
             </div>
-
-            ${!car.archived ? `
-            <div class="status-actions">
-                <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
-                <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
-                <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
-            </div>
-            ` : ''}
 
             <div class="card-actions">
                 <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
@@ -252,6 +244,14 @@ function generateCarCardHtml(car) {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
             </div>
+
+            ${!car.archived ? `
+            <div class="status-actions">
+                <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
+                <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
+                <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
+            </div>
+            ` : ''}
         </div>
     `;
 }
