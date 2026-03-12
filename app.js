@@ -125,7 +125,10 @@ function init() {
         const user = loginUserInput.value;
         const pass = loginPassInput.value;
 
-        if (pass === 'system02') {
+        const isAdmin = user === 'Admin' && pass === 'system02';
+        const isTomek = user === 'Tomek' && pass === 'tommar';
+
+        if (isAdmin || isTomek) {
             currentUser = user;
             loginOverlay.style.display = 'none';
             appContainer.style.display = 'block';
