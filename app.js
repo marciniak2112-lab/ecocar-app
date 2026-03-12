@@ -64,6 +64,7 @@ const confirmModal = document.getElementById('confirm-modal');
 const confirmOkBtn = document.getElementById('confirm-ok');
 const confirmCancelBtn = document.getElementById('confirm-cancel');
 const confirmMessageEl = document.getElementById('confirm-message');
+const appContainer = document.getElementById('app');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -120,7 +121,9 @@ function init() {
 
         if (pass === 'system02') {
             loginOverlay.style.display = 'none';
+            appContainer.style.display = 'block';
             showToast(`Zalogowano jako ${user}`, "success");
+            loginPassInput.value = ''; // Clear password
 
             if (user === 'Tomek') {
                 await setDoc(doc(db, 'settings', 'tomek_login'), {
