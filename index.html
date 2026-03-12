@@ -109,6 +109,18 @@
                 <input type="text" id="search-input" placeholder="Szukaj modelu, marki lub właściciela...">
             </section>
 
+            <div id="archive-controls" class="archive-controls glass" style="display: none;">
+                <div class="period-filters">
+                    <button class="period-btn active" data-period="all">Wszystko</button>
+                    <button class="period-btn" data-period="month">Miesiąc</button>
+                    <button class="period-btn" data-period="3months">3 Miesiące</button>
+                </div>
+                <div class="archive-stats">
+                    <span class="label">Suma w Archiwum:</span>
+                    <span id="archive-total-value" class="val">0,00 zł</span>
+                </div>
+            </div>
+
             <div id="cars-grid" class="cars-grid">
                 <!-- Car cards will be injected here -->
                 <div class="empty-state">

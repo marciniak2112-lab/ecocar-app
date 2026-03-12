@@ -37,6 +37,7 @@ const carsCol = collection(db, 'cars');
 let cars = [];
 let currentView = 'active'; // 'active', 'archive', or 'admin'
 let currentUser = ''; // 'Admin' or 'Tomek'
+let archivePeriod = 'all'; // 'all', 'month', '3months'
 
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
@@ -71,6 +72,9 @@ const confirmMessageEl = document.getElementById('confirm-message');
 const appContainer = document.getElementById('app');
 const loggedUserNameEl = document.getElementById('logged-user-name');
 const logoutBtn = document.getElementById('logout-btn');
+const archiveControls = document.getElementById('archive-controls');
+const archiveTotalValueEl = document.getElementById('archive-total-value');
+const periodBtns = document.querySelectorAll('.period-btn');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -96,6 +100,7 @@ function init() {
         viewArchiveBtn.classList.remove('active');
         viewAdminBtn.classList.remove('active');
         adminSection.style.display = 'none';
+        archiveControls.style.display = 'none';
         carsGrid.style.display = 'grid';
         renderCars(searchInput.value);
     };
@@ -106,6 +111,7 @@ function init() {
         viewArchiveBtn.classList.add('active');
         viewAdminBtn.classList.remove('active');
         adminSection.style.display = 'none';
+        archiveControls.style.display = 'flex';
         carsGrid.style.display = 'grid';
         renderCars(searchInput.value);
     };
@@ -116,9 +122,19 @@ function init() {
         viewArchiveBtn.classList.remove('active');
         viewAdminBtn.classList.add('active');
         adminSection.style.display = 'block';
+        archiveControls.style.display = 'none';
         carsGrid.style.display = 'none';
         loadAdminData();
     };
+
+    periodBtns.forEach(btn => {
+        btn.onclick = () => {
+            periodBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            archivePeriod = btn.dataset.period;
+            renderCars(searchInput.value);
+        };
+    });
 
     // Login Logic
     loginBtn.onclick = async () => {
@@ -280,7 +296,28 @@ function renderCars(filter = '') {
 
     // Filter by view state (active vs archive)
     let filteredCars = cars.filter(car => {
-        return currentView === 'active' ? !car.archived : car.archived;
+        const isArchive = car.archived;
+        if (currentView === 'active') return !isArchive;
+        if (currentView === 'archive') {
+            if (!isArchive) return false;
+
+            // Period Filter
+            if (archivePeriod === 'all') return true;
+
+            const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate) : null;
+            if (!releaseDate) return archivePeriod === 'all';
+
+            const now = new Date();
+            if (archivePeriod === 'month') {
+                return releaseDate.getMonth() === now.getMonth() && releaseDate.getFullYear() === now.getFullYear();
+            }
+            if (archivePeriod === '3months') {
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(now.getMonth() - 3);
+                return releaseDate >= threeMonthsAgo;
+            }
+        }
+        return false;
     });
 
     // Apply text filter
@@ -314,6 +351,10 @@ function renderCars(filter = '') {
 
 function renderArchiveRows(filteredCars) {
     const sorted = [...filteredCars].sort((a, b) => new Date(b.statusChangeDate || b.dateAdded) - new Date(a.statusChangeDate || b.dateAdded));
+
+    // Calculate Total for filtered archive
+    const totalArchiveValue = filteredCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
+    archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
 
     let html = `
         <div class="archive-container">
