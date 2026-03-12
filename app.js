@@ -449,7 +449,7 @@ function attachCardListeners() {
     document.querySelectorAll('.btn-archive').forEach(btn => {
         btn.onclick = () => archiveCar(btn.dataset.id);
     });
-    document.querySelectorAll('.btn-status').forEach(btn => {
+    document.querySelectorAll('.btn-status:not(.btn-archive)').forEach(btn => {
         btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
     });
 }
