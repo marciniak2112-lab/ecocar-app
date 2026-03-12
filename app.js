@@ -225,9 +225,18 @@ function showToast(message, type = 'info') {
 }
 
 // Custom Confirmation Modal Helper
-function showConfirm(message) {
+function showConfirm(message, confirmBtnText = 'OK', cancelBtnText = 'Anuluj', isDanger = false) {
     return new Promise((resolve) => {
         confirmMessageEl.textContent = message;
+        confirmOkBtn.textContent = confirmBtnText;
+        confirmCancelBtn.textContent = cancelBtnText;
+
+        if (isDanger) {
+            confirmOkBtn.classList.add('danger');
+        } else {
+            confirmOkBtn.classList.remove('danger');
+        }
+
         confirmModal.classList.add('active');
 
         const cleanup = (result) => {
@@ -447,7 +456,12 @@ function attachCardListeners() {
 
 async function archiveCar(id) {
     const car = cars.find(c => c.id === id);
-    const confirmed = await showConfirm(`Czy na pewno chcesz wysłać auto ${car ? car.brand : ''} do archiwum?`);
+    const confirmed = await showConfirm(
+        `Czy na pewno chcesz wysłać auto ${car ? car.brand : ''} do archiwum?`,
+        'PRZENIEŚ',
+        'ANULUJ',
+        false
+    );
     if (confirmed) {
         try {
             await updateDoc(doc(db, 'cars', id), {
@@ -571,7 +585,12 @@ carForm.addEventListener('submit', async (e) => {
 
 async function deleteCar(id) {
     const car = cars.find(c => c.id === id);
-    const confirmed = await showConfirm(`Czy na pewno chcesz usunąć samochód ${car ? car.brand : ''}? Operacja jest nieodwracalna.`);
+    const confirmed = await showConfirm(
+        `Czy na pewno chcesz usunąć samochód ${car ? car.brand : ''}? Operacja jest nieodwracalna.`,
+        'USUŃ',
+        'ANULUJ',
+        true
+    );
     if (confirmed) {
         try {
             await deleteDoc(doc(db, 'cars', id));

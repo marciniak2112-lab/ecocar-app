@@ -898,13 +898,13 @@ header {
 }
 
 .confirm-content h3 {
-    color: #ff4b2b;
+    color: var(--primary-green);
     margin-bottom: 1rem;
     font-size: 1.5rem;
 }
 
 .confirm-content p {
-    color: var(--text-muted);
+    color: var(--text-main);
     margin-bottom: 2rem;
 }
 
@@ -917,6 +917,13 @@ header {
 .btn-primary.danger {
     background: #ff4b2b !important;
     color: white !important;
+    box-shadow: 0 0 20px rgba(255, 75, 43, 0.2) !important;
+}
+
+.modal-content h2,
+.modal-content h3 {
+    font-family: var(--font-family);
+    font-weight: 700;
 }
 
 .btn-primary.danger:hover {
