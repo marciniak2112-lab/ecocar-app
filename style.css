@@ -929,7 +929,9 @@ header {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: var(--bg-color);
+    background: linear-gradient(rgba(10, 10, 12, 0.7), rgba(10, 10, 12, 0.9)), url('assets/login-bg.png');
+    background-size: cover;
+    background-position: center;
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -940,13 +942,33 @@ header {
 .login-card {
     width: 100%;
     max-width: 400px;
-    padding: 2.5rem;
+    padding: 3rem 2.5rem;
     text-align: center;
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(57, 255, 20, 0.05) 0%, transparent 70%);
+    pointer-events: none;
 }
 
 .login-card h2 {
-    margin-bottom: 2rem;
-    font-size: 2rem;
+    margin-bottom: 2.5rem;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -1px;
+}
+
+.login-card h2 span {
     color: var(--primary-green);
 }
 
