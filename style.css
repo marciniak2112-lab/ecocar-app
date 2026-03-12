@@ -765,12 +765,11 @@ header {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--primary-green);
-    margin: 12px 0;
-    padding: 10px;
+    margin: 8px 0;
+    padding: 8px;
     background: rgba(57, 255, 20, 0.05);
-    border-radius: 10px;
+    border-radius: 8px;
     text-align: center;
-    box-shadow: inset 0 0 10px rgba(57, 255, 20, 0.05);
 }
 
 .countdown-timer .expired {
@@ -926,6 +925,76 @@ header {
     box-shadow: 0 0 30px rgba(255, 75, 43, 0.4) !important;
 }
 
+/* Login Overlay */
+#login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-main);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 2.5rem;
+    text-align: center;
+}
+
+.login-card h2 {
+    margin-bottom: 2rem;
+    font-size: 2rem;
+    color: var(--primary-green);
+}
+
+.login-card select,
+.login-card input {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+/* Admin Logs */
+.admin-section {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.tomek-info {
+    background: var(--glass-bg);
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    margin-bottom: 2rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.logs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.log-item {
+    background: var(--card-bg);
+    padding: 1rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--primary-green);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.log-date {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
 @media (max-width: 600px) {
     #toast-container {
         bottom: 12px;
@@ -935,86 +1004,5 @@ header {
 
     .toast {
         min-width: 0;
-    }
-
-    /* Login Overlay */
-    #login-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #000;
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .login-card {
-        width: 100%;
-        max-width: 400px;
-        padding: 2.5rem;
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        text-align: center;
-    }
-
-    .login-card h2 {
-        margin-bottom: 2rem;
-        font-size: 2rem;
-    }
-
-    .login-form .form-group {
-        text-align: left;
-        margin-bottom: 1.5rem;
-    }
-
-    /* Admin Panel */
-    .admin-content {
-        max-width: 600px;
-    }
-
-    .admin-section {
-        margin-bottom: 2rem;
-        text-align: left;
-    }
-
-    .admin-section h3 {
-        margin-bottom: 1rem;
-        font-size: 1.2rem;
-        color: var(--primary-green);
-    }
-
-    .log-list {
-        list-style: none;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    .log-item {
-        font-size: 0.9rem;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .log-item:last-child {
-        border-bottom: none;
-    }
-
-    .log-date {
-        color: var(--text-muted);
-        font-size: 0.8rem;
-        margin-right: 10px;
-    }
-
-    .admin-only {
-        display: none;
-    }
-
-    body.user-admin .admin-only {
-        display: flex;
     }
 }

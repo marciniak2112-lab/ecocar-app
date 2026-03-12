@@ -1,28 +1,6 @@
 <!DOCTYPE html>
 <html lang="pl">
 
-<div id="login-overlay">
-    <div class="login-card glass">
-        <div class="logo" style="margin-bottom: 2rem; justify-content: center;">
-            <span class="eco">Eco</span><span class="car">Car</span><span class="pro">Pro</span>
-        </div>
-        <form id="login-form" class="login-form">
-            <div class="form-group">
-                <label for="login-user">Użytkownik</label>
-                <select id="login-user" class="form-select" required>
-                    <option value="Tomek">Tomek</option>
-                    <option value="Admin">Admin</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="login-pass">Hasło</label>
-                <input type="password" id="login-pass" placeholder="••••••••" required>
-            </div>
-            <button type="submit" class="btn-primary" style="width: 100%;">Zaloguj</button>
-        </form>
-    </div>
-</div>
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,6 +14,24 @@
 </head>
 
 <body class="dark-theme">
+    <div id="login-overlay">
+        <div class="login-card glass">
+            <h2>EcoCar System</h2>
+            <div class="form-group">
+                <label>Użytkownik</label>
+                <select id="login-user">
+                    <option value="Admin">Admin</option>
+                    <option value="Tomek">Tomek</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Hasło</label>
+                <input type="password" id="login-password" placeholder="Wpisz hasło">
+            </div>
+            <button id="login-btn" class="btn-primary" style="width: 100%">Zaloguj</button>
+        </div>
+    </div>
+
     <div id="app">
         <header>
             <div class="logo">
@@ -45,6 +41,7 @@
                 <div class="view-tabs">
                     <button id="view-active" class="tab-btn active">Aktywne</button>
                     <button id="view-archive" class="tab-btn">Archiwum</button>
+                    <button id="view-admin" class="tab-btn">Panel Admin</button>
                 </div>
             </div>
             <div class="header-actions">
@@ -76,21 +73,14 @@
                     </svg>
                     Dodaj Auto
                 </button>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                Pomoc
-                </button>
-                <button id="admin-panel-btn" class="btn-secondary admin-only" title="Panel Admina">
+                <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
-                    Admin
+                    Pomoc
                 </button>
             </div>
         </header>
@@ -111,12 +101,25 @@
                 <input type="text" id="search-input" placeholder="Szukaj modelu, marki lub właściciela...">
             </section>
 
-            <section id="cars-grid" class="cars-grid">
+            <div id="cars-grid" class="cars-grid">
                 <!-- Car cards will be injected here -->
                 <div class="empty-state">
                     <p>Brak samochodów w systemie. Kliknij "Dodaj Auto", aby zacząć.</p>
                 </div>
-            </section>
+            </div>
+
+            <div id="admin-section" class="admin-section" style="display: none;">
+                <div class="tomek-info glass">
+                    <h3>Ostatnie logowanie Tomasza</h3>
+                    <p id="tomek-last-login">Ładowanie...</p>
+                </div>
+                <div class="logs-container">
+                    <h3>Ostatnie wejścia i zmiany (10)</h3>
+                    <div id="logs-list" class="logs-list">
+                        <!-- Logs will be injected here -->
+                    </div>
+                </div>
+            </div>
         </main>
 
         <!-- Modal for Adding/Editing Car -->
@@ -228,29 +231,6 @@
                 <p><strong>Kontakt:</strong></p>
                 <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chrom@gmail.com</a></p>
                 <p>📞 <a href="tel:+48605595049">605 595 049</a></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Admin Panel Modal -->
-    <div id="admin-modal" class="modal">
-        <div class="modal-content glass admin-content">
-            <div class="modal-header">
-                <h2>Panel Administratora</h2>
-                <button id="close-admin-modal" class="btn-close">&times;</button>
-            </div>
-            <div class="admin-section">
-                <h3>Statystyki logowania</h3>
-                <p>Ostatnie logowanie Tomka: <span id="tomek-last-login">Brak danych</span></p>
-            </div>
-            <div class="admin-section">
-                <h3>10 ostatnich zmian</h3>
-                <div id="activity-log" class="log-list">
-                    <div class="log-item">Ładowanie logów...</div>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button id="logout-btn" class="btn-secondary">Wyloguj</button>
             </div>
         </div>
     </div>
