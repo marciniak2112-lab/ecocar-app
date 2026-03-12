@@ -49,6 +49,13 @@ const sunIcon = document.getElementById('sun-icon');
 const moonIcon = document.getElementById('moon-icon');
 const viewActiveBtn = document.getElementById('view-active');
 const viewArchiveBtn = document.getElementById('view-archive');
+const helpBtn = document.getElementById('help-btn');
+const helpModal = document.getElementById('help-modal');
+const closeHelpModalBtn = document.getElementById('close-help-modal');
+const confirmModal = document.getElementById('confirm-modal');
+const confirmOkBtn = document.getElementById('confirm-ok');
+const confirmCancelBtn = document.getElementById('confirm-cancel');
+const confirmMessageEl = document.getElementById('confirm-message');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -114,6 +121,27 @@ function showToast(message, type = 'info') {
         toast.classList.add('fade-out');
         setTimeout(() => toast.remove(), 500);
     }, 3000);
+}
+
+// Custom Confirmation Modal Helper
+function showConfirm(message) {
+    return new Promise((resolve) => {
+        confirmMessageEl.textContent = message;
+        confirmModal.classList.add('active');
+
+        const cleanup = (result) => {
+            confirmModal.classList.remove('active');
+            confirmOkBtn.removeEventListener('click', onOk);
+            confirmCancelBtn.removeEventListener('click', onCancel);
+            resolve(result);
+        };
+
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+
+        confirmOkBtn.addEventListener('click', onOk);
+        confirmCancelBtn.addEventListener('click', onCancel);
+    });
 }
 
 function applyTheme(theme) {
@@ -344,10 +372,18 @@ closeModalBtn.addEventListener('click', () => {
 });
 
 window.onclick = (event) => {
-    if (event.target === carModal) {
-        carModal.classList.remove('active');
-    }
+    if (event.target === carModal) carModal.classList.remove('active');
+    if (event.target === helpModal) helpModal.classList.remove('active');
+    if (event.target === confirmModal) confirmModal.classList.remove('active');
 };
+
+helpBtn.addEventListener('click', () => {
+    helpModal.classList.add('active');
+});
+
+closeHelpModalBtn.addEventListener('click', () => {
+    helpModal.classList.remove('active');
+});
 
 carForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -386,7 +422,8 @@ carForm.addEventListener('submit', async (e) => {
 });
 
 async function deleteCar(id) {
-    if (confirm('Czy na pewno chcesz usunąć ten samochód?')) {
+    const confirmed = await showConfirm('Czy na pewno chcesz usunąć ten samochód? Operacja jest nieodwracalna.');
+    if (confirmed) {
         try {
             await deleteDoc(doc(db, 'cars', id));
             showToast("Usunięto samochód", "success");

@@ -861,3 +861,80 @@ header {
         justify-content: flex-start;
     }
 }
+
+/* Developer Info Styling */
+.help-content {
+    max-width: 400px;
+}
+
+.dev-info {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.dev-info p {
+    margin-bottom: 0.8rem;
+    font-size: 1rem;
+}
+
+.dev-info hr {
+    margin: 1.5rem 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+    opacity: 0.3;
+}
+
+.dev-info a {
+    color: var(--primary-green);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.dev-info a:hover {
+    text-decoration: underline;
+}
+
+/* Custom Confirmation Modal */
+.confirm-content {
+    max-width: 350px !important;
+    text-align: center;
+    padding: 2.5rem 2rem !important;
+}
+
+.confirm-content h3 {
+    color: #ff4b2b;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.confirm-content p {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn-primary.danger {
+    background: #ff4b2b !important;
+    color: white !important;
+}
+
+.btn-primary.danger:hover {
+    box-shadow: 0 0 30px rgba(255, 75, 43, 0.4) !important;
+}
+
+@media (max-width: 600px) {
+    #toast-container {
+        bottom: 12px;
+        right: 12px;
+        left: 12px;
+    }
+
+    .toast {
+        min-width: 0;
+    }
+}
