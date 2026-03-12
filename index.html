@@ -103,6 +103,37 @@
                         <textarea id="car-history" placeholder="Opisz naprawy, serwis, modyfikacje..."
                             rows="4"></textarea>
                     </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="car-worker">Przypisz Pracownika</label>
+                            <select id="car-worker" class="form-select">
+                                <option value="">Wybierz pracownika...</option>
+                                <option value="Adam">Adam</option>
+                                <option value="Łukasz">Łukasz</option>
+                                <option value="Nastka">Nastka</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Do zrobienia:</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Konserwacja podwozia">
+                                <span class="checkmark"></span>
+                                Konserwacja podwozia
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Ceramika">
+                                <span class="checkmark"></span>
+                                Ceramika
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Czyszczenie środka">
+                                <span class="checkmark"></span>
+                                Czyszczenie środka
+                            </label>
+                        </div>
+                    </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-submit">Zapisz Auto</button>
                     </div>

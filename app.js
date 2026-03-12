@@ -87,7 +87,9 @@ function renderCars(filter = '') {
     const filteredCars = cars.filter(car =>
         (car.brand || '').toLowerCase().includes(searchTerm) ||
         (car.ownerPhone || '').includes(searchTerm) ||
-        (car.history || '').toLowerCase().includes(searchTerm)
+        (car.history || '').toLowerCase().includes(searchTerm) ||
+        (car.worker || '').toLowerCase().includes(searchTerm) ||
+        (car.todo || []).some(item => item.toLowerCase().includes(searchTerm))
     );
 
     if (filteredCars.length === 0) {
@@ -110,6 +112,22 @@ function renderCars(filter = '') {
                 <span class="label">Właściciel</span>
                 <span class="val">${car.ownerPhone}</span>
             </div>
+            ${car.worker ? `
+            <div class="car-info-row">
+                <span class="label">Pracownik</span>
+                <span class="val worker-tag">${car.worker}</span>
+            </div>
+            ` : ''}
+            
+            ${car.todo && car.todo.length > 0 ? `
+            <div class="todo-list-preview">
+                <span class="label">Do zrobienia:</span>
+                <ul>
+                    ${car.todo.map(item => `<li><span class="todo-bullet"></span>${item}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
             <div class="car-history-preview">
                 <p><strong>Wykonano:</strong><br>${car.history || 'Brak wpisów'}</p>
             </div>
@@ -153,6 +171,8 @@ addCarBtn.addEventListener('click', () => {
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
     document.getElementById('car-id').value = '';
+    // Clear checkboxes explicitly since reset() might not handle all UI states if customized
+    document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
     carModal.classList.add('active');
 });
 
@@ -170,11 +190,16 @@ carForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const id = document.getElementById('car-id').value;
+    const todoCheckboxes = document.querySelectorAll('input[name="todo"]:checked');
+    const todoList = Array.from(todoCheckboxes).map(cb => cb.value);
+
     const carData = {
         brand: document.getElementById('car-brand').value,
         price: parseFloat(document.getElementById('car-price').value) || 0,
         ownerPhone: document.getElementById('car-owner-phone').value,
         history: document.getElementById('car-history').value,
+        worker: document.getElementById('car-worker').value,
+        todo: todoList,
         dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString()
     };
 
@@ -212,6 +237,13 @@ function editCar(id) {
         document.getElementById('car-price').value = car.price;
         document.getElementById('car-owner-phone').value = car.ownerPhone;
         document.getElementById('car-history').value = car.history;
+        document.getElementById('car-worker').value = car.worker || '';
+
+        // Reset and set checkboxes
+        document.querySelectorAll('input[name="todo"]').forEach(cb => {
+            cb.checked = (car.todo || []).includes(cb.value);
+        });
+
         carModal.classList.add('active');
     }
 }
