@@ -680,7 +680,138 @@ header {
     color: #ff4b2b;
 }
 
-.priority-high .btn-done:hover {
-    background: #ff4b2b;
-    color: white;
+/* Header Nav */
+.header-nav {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
+/* Status Buttons */
+.status-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-status {
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    padding: 6px 4px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+    text-align: center;
+}
+
+.btn-status:hover {
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+}
+
+.btn-status.active[data-status="przyjedzie"] {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+.btn-status.active[data-status="w-trakcie"] {
+    background: rgba(0, 123, 255, 0.2);
+    color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-status.active[data-status="gotowe"] {
+    background: rgba(57, 255, 20, 0.2);
+    color: var(--primary-green);
+    border-color: var(--primary-green);
+}
+
+.arrival-date-tag {
+    display: block;
+    font-size: 0.75rem;
+    color: #ffc107;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+/* Toast Notifications */
+#toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.toast {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 12px 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 250px;
+    animation: toastSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast.success {
+    border-left: 4px solid var(--primary-green);
+}
+
+.toast.error {
+    border-left: 4px solid #ff4b2b;
+}
+
+.toast.info {
+    border-left: 4px solid #007bff;
+}
+
+@keyframes toastSlideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast.fade-out {
+    animation: toastFadeOut 0.5s forwards;
+}
+
+@keyframes toastFadeOut {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Responsive Header */
+@media (max-width: 800px) {
+    header {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .header-nav {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+    }
 }

@@ -59,6 +59,7 @@ function init() {
     const q = query(carsCol, orderBy('dateAdded', 'desc'));
     onSnapshot(q, (snapshot) => {
         cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        processAutoArchiving();
         renderCars();
         updateStats();
     });
@@ -77,6 +78,42 @@ function init() {
         viewActiveBtn.classList.remove('active');
         renderCars(searchInput.value);
     };
+}
+
+// Logic to check if 1 day has passed for cars marked as "Gotowe"
+async function processAutoArchiving() {
+    const now = new Date();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    for (const car of cars) {
+        if (car.status === 'gotowe' && car.statusChangeDate && !car.archived) {
+            const changeDate = new Date(car.statusChangeDate);
+            if (now - changeDate > oneDayMs) {
+                const carRef = doc(db, 'cars', car.id);
+                try {
+                    await updateDoc(carRef, { archived: true });
+                } catch (e) {
+                    console.error("Auto-archive error:", e);
+                }
+            }
+        }
+    }
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+        <span class="toast-msg">${message}</span>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
 }
 
 function applyTheme(theme) {
@@ -105,8 +142,7 @@ function renderCars(filter = '') {
 
     // Filter by view state (active vs archive)
     let filteredCars = cars.filter(car => {
-        const isArchived = car.archived === true;
-        return currentView === 'active' ? !isArchived : isArchived;
+        return currentView === 'active' ? !car.archived : car.archived;
     });
 
     // Apply text filter
@@ -164,8 +200,10 @@ function renderArchiveGrouped(filteredCars) {
 }
 
 function generateCarCardHtml(car) {
+    const status = car.status || 'przyjedzie';
     return `
         <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
+            ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
             <h3>${car.brand}</h3>
             <div class="car-info-row">
                 <span class="label">Wartość Usługi</span>
@@ -194,6 +232,15 @@ function generateCarCardHtml(car) {
             <div class="car-history-preview">
                 <p><strong>Wykonano:</strong><br>${car.history || 'Brak wpisów'}</p>
             </div>
+
+            ${!car.archived ? `
+            <div class="status-actions">
+                <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
+                <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
+                <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
+            </div>
+            ` : ''}
+
             <div class="card-actions">
                 <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -201,7 +248,6 @@ function generateCarCardHtml(car) {
                 <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
-                ${!car.archived ? `<button class="btn-done" data-id="${car.id}">Gotowe</button>` : ''}
             </div>
         </div>
     `;
@@ -214,9 +260,22 @@ function attachCardListeners() {
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.onclick = () => deleteCar(btn.dataset.id);
     });
-    document.querySelectorAll('.btn-done').forEach(btn => {
-        btn.onclick = () => markAsDone(btn.dataset.id);
+    document.querySelectorAll('.btn-status').forEach(btn => {
+        btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
     });
+}
+
+async function updateCarStatus(id, newStatus) {
+    try {
+        const carRef = doc(db, 'cars', id);
+        await updateDoc(carRef, {
+            status: newStatus,
+            statusChangeDate: new Date().toISOString()
+        });
+        showToast(`Zmieniono status na: ${newStatus}`, 'success');
+    } catch (e) {
+        showToast("Błąd przy zmianie statusu", "error");
+    }
 }
 
 function updateStats() {
@@ -269,23 +328,25 @@ carForm.addEventListener('submit', async (e) => {
         ownerPhone: document.getElementById('car-owner-phone').value,
         history: document.getElementById('car-history').value,
         worker: document.getElementById('car-worker').value,
+        arrivalDate: document.getElementById('car-arrival-date').value,
         todo: todoList,
         priority: document.getElementById('car-priority').checked,
         archived: id ? (cars.find(c => c.id === id).archived || false) : false,
+        status: id ? (cars.find(c => c.id === id).status || 'przyjedzie') : 'przyjedzie',
         dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString()
     };
 
     try {
         if (id) {
-            const carRef = doc(db, 'cars', id);
-            await updateDoc(carRef, carData);
+            await updateDoc(doc(db, 'cars', id), carData);
+            showToast("Zaktualizowano dane", "success");
         } else {
             await addDoc(carsCol, carData);
+            showToast("Dodano nowe auto", "success");
         }
         carModal.classList.remove('active');
     } catch (error) {
-        console.error("Error saving car: ", error);
-        alert("Błąd podczas zapisywania danych w Firebase. Sprawdź konsolę.");
+        showToast("Błąd zapisu danych", "error");
     }
 });
 
@@ -293,24 +354,10 @@ async function deleteCar(id) {
     if (confirm('Czy na pewno chcesz usunąć ten samochód?')) {
         try {
             await deleteDoc(doc(db, 'cars', id));
+            showToast("Usunięto samochód", "success");
         } catch (error) {
-            console.error("Error deleting car: ", error);
-            alert("Błąd podczas usuwania.");
+            showToast("Błąd usuwania", "error");
         }
-    }
-}
-
-async function markAsDone(id) {
-    try {
-        const carRef = doc(db, 'cars', id);
-        // We update the dateAdded to NOW so it appears first in archive for the date it was completed
-        await updateDoc(carRef, {
-            archived: true,
-            dateAdded: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error("Error archiving car: ", error);
-        alert("Błąd podczas archiwizacji.");
     }
 }
 
@@ -324,6 +371,7 @@ function editCar(id) {
         document.getElementById('car-owner-phone').value = car.ownerPhone;
         document.getElementById('car-history').value = car.history;
         document.getElementById('car-worker').value = car.worker || '';
+        document.getElementById('car-arrival-date').value = car.arrivalDate || '';
         document.getElementById('car-priority').checked = car.priority || false;
 
         // Reset and set checkboxes

@@ -19,6 +19,12 @@
             <div class="logo">
                 <span class="eco">Eco</span><span class="car">Car</span><span class="pro">Pro</span>
             </div>
+            <div class="header-nav">
+                <div class="view-tabs">
+                    <button id="view-active" class="tab-btn active">Aktywne</button>
+                    <button id="view-archive" class="tab-btn">Archiwum</button>
+                </div>
+            </div>
             <div class="header-actions">
                 <button id="theme-toggle" class="btn-secondary" title="Przełącz motyw">
                     <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -48,10 +54,6 @@
                     </svg>
                     Dodaj Auto
                 </button>
-                <div class="view-tabs">
-                    <button id="view-active" class="tab-btn active">Aktywne</button>
-                    <button id="view-archive" class="tab-btn">Archiwum</button>
-                </div>
             </div>
         </header>
 
@@ -101,6 +103,10 @@
                             <label for="car-owner-phone">Telefon Właściciela</label>
                             <input type="tel" id="car-owner-phone" placeholder="123 456 789" required>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="car-arrival-date">Data Przyjazdu</label>
+                        <input type="date" id="car-arrival-date">
                     </div>
                     <div class="form-group">
                         <label for="car-history">Co zostało zrobione?</label>
@@ -153,6 +159,7 @@
         </div>
     </div>
 
+    <div id="toast-container"></div>
     <script type="module" src="app.js"></script>
 </body>
 
