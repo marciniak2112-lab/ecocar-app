@@ -122,29 +122,36 @@ function init() {
 
     // Login Logic
     loginBtn.onclick = async () => {
-        const user = loginUserInput.value;
-        const pass = loginPassInput.value;
+        const user = loginUserInput.value.trim();
+        const pass = loginPassInput.value.trim();
 
-        const isAdmin = user === 'Admin' && pass === 'system02';
-        const isTomek = user === 'Tomek' && pass === 'tommar';
+        // Case-insensitive check for user, but exact for password
+        const isAdmin = user.toLowerCase() === 'admin' && pass === 'system02';
+        const isTomek = user.toLowerCase() === 'tomek' && pass === 'tommar';
 
         if (isAdmin || isTomek) {
-            currentUser = user;
+            // Standardize username for display
+            currentUser = isAdmin ? 'Admin' : 'Tomek';
+
             loginOverlay.style.display = 'none';
             appContainer.style.display = 'block';
-            loggedUserNameEl.textContent = user;
-            showToast(`Zalogowano jako ${user}`, "success");
-            loginPassInput.value = ''; // Clear password
+            loggedUserNameEl.textContent = currentUser;
+            showToast(`Zalogowano jako ${currentUser}`, "success");
 
-            if (user === 'Tomek') {
-                await setDoc(doc(db, 'settings', 'tomek_login'), {
-                    lastLogin: new Date().toISOString()
-                });
+            loginPassInput.value = ''; // Clear password
+            loginUserInput.value = ''; // Clear user
+
+            if (currentUser === 'Tomek') {
+                try {
+                    await setDoc(doc(db, 'settings', 'tomek_login'), {
+                        lastLogin: new Date().toISOString()
+                    });
+                } catch (e) { console.error("Update login error", e); }
             }
-            logAction(`Zalogowano użytkownika: ${user}`);
+            logAction(`Zalogowano użytkownika: ${currentUser}`);
             renderCars(); // Re-render to apply permissions
         } else {
-            showToast("Błędne hasło", "error");
+            showToast("Błędne hasło lub użytkownik", "error");
         }
     };
 }
