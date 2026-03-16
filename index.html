@@ -129,12 +129,30 @@
             </div>
 
             <div id="admin-section" class="admin-section" style="display: none;">
-                <div class="tomek-info glass">
-                    <h3>Ostatnie logowanie Tomasza</h3>
-                    <p id="tomek-last-login">Ładowanie...</p>
+                <div class="users-status-grid">
+                    <div id="status-tomek" class="user-status-card glass">
+                        <div class="user-avatar">T</div>
+                        <div class="user-info">
+                            <h3>Tomasz</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        </div>
+                    </div>
+                    <div id="status-monia" class="user-status-card glass">
+                        <div class="user-avatar">M</div>
+                        <div class="user-info">
+                            <h3>Monika</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        </div>
+                    </div>
                 </div>
-                <div class="logs-container">
-                    <h3>Ostatnie wejścia i zmiany (10)</h3>
+
+                <div class="logs-container glass">
+                    <div class="logs-header">
+                        <h3>📋 Ostatnie działania (Tomek & Monia)</h3>
+                        <span class="info-tag">10 ostatnich zmian</span>
+                    </div>
                     <div id="logs-list" class="logs-list">
                         <!-- Logs will be injected here -->
                     </div>

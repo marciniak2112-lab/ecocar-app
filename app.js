@@ -198,9 +198,10 @@ function init() {
                 loginPassInput.value = '';
                 loginUserInput.value = '';
 
-                if (currentUser === 'Tomek') {
+                if (currentUser === 'Tomek' || currentUser === 'Monia') {
                     try {
-                        await setDoc(doc(db, 'settings', 'tomek_login'), {
+                        const settingKey = currentUser.toLowerCase() + '_login';
+                        await setDoc(doc(db, 'settings', settingKey), {
                             lastLogin: new Date().toISOString()
                         });
                     } catch (e) { console.error("Update login error", e); }
@@ -221,6 +222,7 @@ function init() {
 async function logAction(actionText) {
     try {
         await addDoc(collection(db, 'logs'), {
+            user: currentUser || 'Gość',
             text: actionText,
             timestamp: new Date().toISOString()
         });
@@ -246,26 +248,57 @@ function updateUIForRole() {
 }
 
 async function loadAdminData() {
-    // Load last log for Tomek
-    const tomekDoc = await getDoc(doc(db, 'settings', 'tomek_login'));
-    if (tomekDoc.exists()) {
-        const date = new Date(tomekDoc.data().lastLogin);
-        tomekLastLoginEl.textContent = date.toLocaleString('pl-PL');
-    }
+    // Helper to update status cards
+    const updateStatusCard = async (userId, cardId) => {
+        const docRef = doc(db, 'settings', userId + '_login');
+        const d = await getDoc(docRef);
+        const card = document.getElementById(cardId);
+        if (!card) return;
 
-    // Load last 10 logs
-    const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(10));
+        const timeEl = card.querySelector('.time');
+        const statusEl = card.querySelector('.status-indicator span');
+
+        if (d.exists()) {
+            const lastLogin = new Date(d.data().lastLogin);
+            timeEl.textContent = lastLogin.toLocaleString('pl-PL');
+
+            // Artificial "Online" check: if logged in within last 5 minutes
+            const diff = new Date() - lastLogin;
+            if (diff < 300000) {
+                statusEl.textContent = 'Online';
+                statusEl.className = 'online';
+            } else {
+                statusEl.textContent = 'Offline';
+                statusEl.className = 'offline';
+            }
+        }
+    };
+
+    await updateStatusCard('tomek', 'status-tomek');
+    await updateStatusCard('monia', 'status-monia');
+
+    // Load last 10 logs for Tomek and Monia only
+    const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
     const logsSnap = await getDocs(logsQ);
-    logsList.innerHTML = logsSnap.docs.map(doc => {
-        const log = doc.data();
+
+    const filteredLogs = logsSnap.docs
+        .map(doc => doc.data())
+        .filter(log => log.user === 'Tomek' || log.user === 'Monia')
+        .slice(0, 10);
+
+    logsList.innerHTML = filteredLogs.map(log => {
         const date = new Date(log.timestamp);
+        const userColor = log.user === 'Monia' ? '#ec4899' : '#10b981';
         return `
-            <div class="log-item">
-                <span>${log.text}</span>
+            <div class="log-item" style="border-left-color: ${userColor}">
+                <div class="log-content">
+                    <strong style="color: ${userColor}">${log.user}:</strong> 
+                    <span>${log.text}</span>
+                </div>
                 <span class="log-date">${date.toLocaleString('pl-PL')}</span>
             </div>
         `;
-    }).join('') || '<p>Brak logów</p>';
+    }).join('') || '<p style="text-align:center; padding: 20px; color: var(--text-muted);">Brak ostatnich aktywności Tomek/Monia</p>';
 }
 
 // Logic to check if 1 day has passed for cars marked as "Gotowe"
