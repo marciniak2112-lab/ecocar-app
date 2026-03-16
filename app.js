@@ -790,18 +790,25 @@ reportForm.addEventListener('submit', async (e) => {
     template.style.fontSize = '12pt';
     template.style.lineHeight = '1.6';
 
-    const renderPhotos = async (files) => {
-        let photosHtml = '<div style="display:flex; flex-wrap:wrap; gap:10pt; justify-content: flex-start;">';
+    const renderPhotos = async (files, label) => {
+        let photosHtml = '<div style="text-align: center; margin-bottom: 15pt;">';
+        let count = 1;
         for (let file of files) {
             const base64 = await fileToBase64(file);
-            photosHtml += `<img src="${base64}" style="max-height: 200pt; max-width: 48%; object-fit: contain; border-radius: 4pt; page-break-inside: avoid;">`;
+            photosHtml += `
+                <div style="display: inline-block; width: 48%; margin: 0 0.5% 15pt; vertical-align: top; page-break-inside: avoid; text-align: center;">
+                    <img src="${base64}" style="width: 100%; max-height: 250pt; object-fit: contain; border-radius: 4pt; border: 1px solid #ddd; padding: 2pt;">
+                    <p style="margin: 5pt 0 0; font-size: 10pt; color: #555; font-weight: bold;">${label} ${count}</p>
+                </div>
+            `;
+            count++;
         }
         photosHtml += '</div>';
         return photosHtml;
     };
 
-    const beforePhotosHtml = beforeFiles.length > 0 ? await renderPhotos(beforeFiles) : '<p>Brak zdjęć dołączonych do raportu</p>';
-    const afterPhotosHtml = afterFiles.length > 0 ? await renderPhotos(afterFiles) : '<p>Brak zdjęć po dołączonych do raportu</p>';
+    const beforePhotosHtml = beforeFiles.length > 0 ? await renderPhotos(beforeFiles, 'Stan PRZED - Zdjęcie') : '<p>Brak zdjęć dołączonych do raportu</p>';
+    const afterPhotosHtml = afterFiles.length > 0 ? await renderPhotos(afterFiles, 'Efekt PO - Zdjęcie') : '<p>Brak zdjęć po dołączonych do raportu</p>';
 
     const todoList = (car.todo && car.todo.length > 0) ? `<ul style="margin:0; padding-left:20pt;">${car.todo.map(t => `<li>${t}</li>`).join('')}</ul>` : '<p>Brak dedykowanej listy zadań.</p>';
 
@@ -833,13 +840,13 @@ reportForm.addEventListener('submit', async (e) => {
                 <p style="margin: 0; white-space: pre-wrap; line-height: 1.5;">${notes || '---'}</p>
             </div>
 
-            <div style="margin-bottom: 20pt; page-break-inside: avoid; clear: both;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">4. Dodatkowe Informacje / Zdjęcia Przed</h2>
+            <div style="margin-bottom: 20pt; clear: both;">
+                <h2 style="font-size: 14pt; margin-bottom: 12pt; color: #333; page-break-after: avoid;">4. Dodatkowe Informacje / Zdjęcia Przed</h2>
                 ${beforePhotosHtml}
             </div>
 
-            <div style="margin-bottom: 20pt; page-break-inside: avoid; clear: both;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">5. Dokumentacja Końcowa / Zdjęcia Po</h2>
+            <div style="margin-bottom: 20pt; clear: both;">
+                <h2 style="font-size: 14pt; margin-bottom: 12pt; color: #333; page-break-after: avoid;">5. Dokumentacja Końcowa / Zdjęcia Po</h2>
                 ${afterPhotosHtml}
             </div>
 
