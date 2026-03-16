@@ -492,8 +492,8 @@ function generateCarCardHtml(car) {
                 <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
             </div>
             ${!car.archived ? `
-            <div style="margin-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 12px;">
-                <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(57, 255, 20, 0.1); border-color: rgba(57, 255, 20, 0.3); color: var(--primary-green);">
+            <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
+                <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
                     📥 PRZENIEŚ DO ARCHIWUM
                 </button>
             </div>
