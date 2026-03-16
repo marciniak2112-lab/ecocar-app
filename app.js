@@ -36,7 +36,7 @@ const carsCol = collection(db, 'cars');
 // State Management
 let cars = [];
 let currentView = 'active'; // 'active', 'archive', or 'admin'
-let currentUser = ''; // 'Admin' or 'Tomek'
+let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', or 'Monia'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
 
 // DOM Elements
@@ -85,6 +85,28 @@ function init() {
     // Theme setup
     const savedTheme = localStorage.getItem('ecoCarTheme') || 'dark';
     applyTheme(savedTheme);
+
+    // Auto-logout after 5 reloads logic
+    let reloadCount = parseInt(localStorage.getItem('ecoCarReloadCount') || '0', 10);
+    reloadCount++;
+
+    if (reloadCount >= 5) {
+        localStorage.removeItem('ecoCarReloadCount');
+        localStorage.removeItem('ecoCarUser');
+        currentUser = '';
+        loginOverlay.style.display = 'flex';
+        appContainer.style.display = 'none';
+        showToast("Wylogowano automatycznie po 5 odświeżeniach strony.", "info");
+    } else {
+        localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
+        // If we have a saved user, show the app
+        if (currentUser) {
+            loginOverlay.style.display = 'none';
+            appContainer.style.display = 'block';
+            loggedUserNameEl.textContent = currentUser;
+            updateUIForRole();
+        }
+    }
 
     const q = query(carsCol, orderBy('dateAdded', 'desc'));
     onSnapshot(q, (snapshot) => {
@@ -140,58 +162,57 @@ function init() {
         };
     });
 
-    // Auto-logout after 5 reloads
-    let reloadCount = parseInt(localStorage.getItem('ecoCarReloadCount') || '0', 10);
-    reloadCount++;
-    if (reloadCount >= 5) {
-        localStorage.removeItem('ecoCarReloadCount');
-        // Reset current user so they have to login again next refresh (in memory)
-        // For now, if we reach 5, we just show login.
-        loginOverlay.style.display = 'flex';
-        appContainer.style.display = 'none';
-
-        showToast("Wylogowano automatycznie po 5 odświeżeniach strony.", "info");
-    } else {
-        localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
-    }
-
     // Login Logic
     loginBtn.onclick = async () => {
-        const user = loginUserInput.value.trim();
-        const pass = loginPassInput.value.trim();
+        const userVal = loginUserInput.value.trim();
+        const passVal = loginPassInput.value.trim();
 
-        // Case-insensitive check for user, but exact for password
-        const isAdmin = user.toLowerCase() === 'admin' && pass === 'system02';
-        const isTomek = user.toLowerCase() === 'tomek' && pass === 'tommar';
-        const isMonia = user.toLowerCase() === 'monia' && pass === 'wanda';
+        if (!userVal) {
+            showToast("Podaj nazwę użytkownika", "error");
+            return;
+        }
+        if (!passVal) {
+            showToast("Podaj hasło", "error");
+            return;
+        }
 
-        if (isAdmin || isTomek || isMonia) {
-            // Standardize username for display
-            currentUser = isAdmin ? 'Admin' : (isTomek ? 'Tomek' : 'Monia');
+        const validUsers = {
+            'admin': 'system02',
+            'tomek': 'tommar',
+            'monia': 'wanda'
+        };
 
-            // Reset reload counter upon login
-            localStorage.setItem('ecoCarReloadCount', '0');
+        const canonicalUser = userVal.toLowerCase();
 
-            loginOverlay.style.display = 'none';
-            appContainer.style.display = 'block';
-            loggedUserNameEl.textContent = currentUser;
-            showToast(`Zalogowano jako ${currentUser}`, "success");
+        if (validUsers[canonicalUser]) {
+            if (validUsers[canonicalUser] === passVal) {
+                currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
+                localStorage.setItem('ecoCarUser', currentUser);
+                localStorage.setItem('ecoCarReloadCount', '0');
 
-            loginPassInput.value = ''; // Clear password
-            loginUserInput.value = ''; // Clear user
+                loginOverlay.style.display = 'none';
+                appContainer.style.display = 'block';
+                loggedUserNameEl.textContent = currentUser;
+                showToast(`Zalogowano jako ${currentUser}`, "success");
 
-            if (currentUser === 'Tomek') {
-                try {
-                    await setDoc(doc(db, 'settings', 'tomek_login'), {
-                        lastLogin: new Date().toISOString()
-                    });
-                } catch (e) { console.error("Update login error", e); }
+                loginPassInput.value = '';
+                loginUserInput.value = '';
+
+                if (currentUser === 'Tomek') {
+                    try {
+                        await setDoc(doc(db, 'settings', 'tomek_login'), {
+                            lastLogin: new Date().toISOString()
+                        });
+                    } catch (e) { console.error("Update login error", e); }
+                }
+                logAction(`Zalogowano użytkownika: ${currentUser}`);
+                updateUIForRole();
+                renderCars();
+            } else {
+                showToast("Błędne hasło dla tego użytkownika", "error");
             }
-            logAction(`Zalogowano użytkownika: ${currentUser}`);
-            updateUIForRole();
-            renderCars(); // Re-render to apply permissions
         } else {
-            showToast("Błędne hasło lub użytkownik", "error");
+            showToast("Użytkownik nie istnieje w systemie", "error");
         }
     };
     updateUIForRole();
@@ -649,6 +670,8 @@ closeHelpModalBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', () => {
     currentUser = '';
+    localStorage.removeItem('ecoCarUser');
+    localStorage.removeItem('ecoCarReloadCount');
     appContainer.style.display = 'none';
     loginOverlay.style.display = 'flex';
     loggedUserNameEl.textContent = 'Gość';
