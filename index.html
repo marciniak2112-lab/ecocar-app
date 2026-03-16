@@ -167,6 +167,10 @@
                             <input type="number" id="car-price" placeholder="0.00" required>
                         </div>
                         <div class="form-group">
+                            <label for="car-owner-name">Imię Właściciela</label>
+                            <input type="text" id="car-owner-name" placeholder="np. Jan Kowalski" required>
+                        </div>
+                        <div class="form-group">
                             <label for="car-owner-phone">Telefon Właściciela</label>
                             <input type="tel" id="car-owner-phone" placeholder="123 456 789" required>
                         </div>
@@ -243,6 +247,38 @@
         </div>
     </div>
 
+    <!-- Report Modal -->
+    <div id="report-modal" class="modal">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h2>Opcje Raportu</h2>
+                <button id="close-report-modal" class="btn-close">&times;</button>
+            </div>
+            <form id="report-form">
+                <input type="hidden" id="report-car-id">
+                <div class="form-group">
+                    <label for="report-hours">Dodatkowe roboczogodziny</label>
+                    <input type="number" id="report-hours" placeholder="np. 5">
+                </div>
+                <div class="form-group">
+                    <label for="report-notes">Dodatkowe uwagi dla klienta</label>
+                    <textarea id="report-notes" rows="3" placeholder="Zauważyliśmy..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Zdjęcia PRZED</label>
+                    <input type="file" id="report-photos-before" accept="image/*" multiple>
+                </div>
+                <div class="form-group">
+                    <label>Zdjęcia PO</label>
+                    <input type="file" id="report-photos-after" accept="image/*" multiple>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">Pobierz PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Help Modal -->
     <div id="help-modal" class="modal">
         <div class="modal-content glass help-content">
@@ -262,6 +298,7 @@
     </div>
 
     <div id="toast-container"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 

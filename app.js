@@ -75,6 +75,10 @@ const logoutBtn = document.getElementById('logout-btn');
 const archiveControls = document.getElementById('archive-controls');
 const archiveTotalValueEl = document.getElementById('archive-total-value');
 const periodBtns = document.querySelectorAll('.period-btn');
+const reportModal = document.getElementById('report-modal');
+const reportForm = document.getElementById('report-form');
+const closeReportModalBtn = document.getElementById('close-report-modal');
+const reportCarIdInput = document.getElementById('report-car-id');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -320,10 +324,10 @@ function renderCars(filter = '') {
         return false;
     });
 
-    // Apply text filter
     filteredCars = filteredCars.filter(car =>
         (car.brand || '').toLowerCase().includes(searchTerm) ||
         (car.plateNum || '').toLowerCase().includes(searchTerm) ||
+        (car.ownerName || '').toLowerCase().includes(searchTerm) ||
         (car.ownerPhone || '').includes(searchTerm) ||
         (car.history || '').toLowerCase().includes(searchTerm) ||
         (car.worker || '').toLowerCase().includes(searchTerm) ||
@@ -372,20 +376,23 @@ function renderArchiveRows(filteredCars) {
         const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : '---';
         html += `
             <div class="archive-row glass" data-id="${car.id}">
-                <span class="col owner">${car.ownerPhone}</span>
+                <span class="col owner">${car.ownerName || '---'} / ${car.ownerPhone}</span>
                 <span class="col brand">${car.brand}</span>
                 <span class="col plates">${car.plateNum || '---'}</span>
                 <span class="col date">${releaseDate}</span>
-                ${currentUser === 'Admin' ? `
                 <span class="col actions">
+                    <button class="btn-icon btn-report" data-id="${car.id}" title="Pobierz Raport">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    </button>
+                ${currentUser === 'Admin' ? `
                     <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
                     <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
-                </span>
                 ` : ''}
+                </span>
             </div>
         `;
     });
@@ -447,7 +454,7 @@ function generateCarCardHtml(car) {
             </div>
             <div class="car-info-row">
                 <span class="label">Właściciel</span>
-                <span class="val">${car.ownerPhone}</span>
+                <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
             </div>
             ${car.worker ? `
             <div class="car-info-row">
@@ -512,6 +519,9 @@ function attachCardListeners() {
     });
     document.querySelectorAll('.btn-archive').forEach(btn => {
         btn.onclick = () => archiveCar(btn.dataset.id);
+    });
+    document.querySelectorAll('.btn-report').forEach(btn => {
+        btn.onclick = () => openReportModal(btn.dataset.id);
     });
     document.querySelectorAll('.btn-status:not(.btn-archive)').forEach(btn => {
         btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
@@ -591,7 +601,14 @@ window.onclick = (event) => {
     if (event.target === carModal) carModal.classList.remove('active');
     if (event.target === helpModal) helpModal.classList.remove('active');
     if (event.target === confirmModal) confirmModal.classList.remove('active');
+    if (event.target === reportModal) reportModal.classList.remove('active');
 };
+
+if (closeReportModalBtn) {
+    closeReportModalBtn.addEventListener('click', () => {
+        reportModal.classList.remove('active');
+    });
+}
 
 helpBtn.addEventListener('click', () => {
     helpModal.classList.add('active');
@@ -621,6 +638,7 @@ carForm.addEventListener('submit', async (e) => {
         brand: document.getElementById('car-brand').value,
         plateNum: document.getElementById('car-plate').value,
         price: parseFloat(document.getElementById('car-price').value) || 0,
+        ownerName: document.getElementById('car-owner-name').value,
         ownerPhone: document.getElementById('car-owner-phone').value,
         history: document.getElementById('car-history').value,
         worker: document.getElementById('car-worker').value,
@@ -676,6 +694,7 @@ function editCar(id) {
         document.getElementById('car-brand').value = car.brand;
         document.getElementById('car-plate').value = car.plateNum || '';
         document.getElementById('car-price').value = car.price;
+        document.getElementById('car-owner-name').value = car.ownerName || '';
         document.getElementById('car-owner-phone').value = car.ownerPhone;
         document.getElementById('car-history').value = car.history;
         document.getElementById('car-worker').value = car.worker || '';
@@ -691,6 +710,132 @@ function editCar(id) {
         carModal.classList.add('active');
     }
 }
+
+function openReportModal(id) {
+    const car = cars.find(c => c.id === id);
+    if (!car) return;
+    document.getElementById('report-car-id').value = id;
+    reportForm.reset();
+    reportModal.classList.add('active');
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+reportForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('report-car-id').value;
+    const car = cars.find(c => c.id === id);
+    if (!car) return;
+
+    const extraHours = document.getElementById('report-hours').value;
+    const notes = document.getElementById('report-notes').value;
+
+    const beforeFiles = document.getElementById('report-photos-before').files;
+    const afterFiles = document.getElementById('report-photos-after').files;
+
+    let template = document.createElement('div');
+    template.style.padding = '30pt';
+    template.style.fontFamily = 'Outfit, sans-serif';
+    template.style.color = '#000';
+    template.style.backgroundColor = '#fff';
+    template.style.fontSize = '12pt';
+    template.style.lineHeight = '1.6';
+
+    const renderPhotos = async (files) => {
+        let photosHtml = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 15pt;">';
+        for (let file of files) {
+            const base64 = await fileToBase64(file);
+            photosHtml += `<img src="${base64}" style="height: 150pt; width: auto; max-width: 100%; object-fit: contain; border-radius: 4pt;">`;
+        }
+        photosHtml += '</div>';
+        return photosHtml;
+    };
+
+    const beforePhotosHtml = beforeFiles.length > 0 ? await renderPhotos(beforeFiles) : '<p>Brak zdjęć dołączonych do raportu</p>';
+    const afterPhotosHtml = afterFiles.length > 0 ? await renderPhotos(afterFiles) : '<p>Brak zdjęć po dołączonych do raportu</p>';
+
+    const todoList = (car.todo && car.todo.length > 0) ? `<ul style="margin:0; padding-left:20pt;">${car.todo.map(t => `<li>${t}</li>`).join('')}</ul>` : '<p>Brak dedykowanej listy zadań.</p>';
+
+    template.innerHTML = `
+        <div style="font-family: inherit;">
+            <h1 style="text-align: center; color: #10b981; margin-bottom: 5pt; font-size: 24pt;">Raport Serwisu Auto Detalingu</h1>
+            <p style="text-align: center; color: #666; font-size: 10pt; margin-bottom: 25pt;">Wystawiono dla: ${car.ownerName || '---'} | Kontakt: ${car.ownerPhone}</p>
+            
+            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">1. Dane Pojazdu i Zlecenia</h2>
+                <div style="display:flex; justify-content:space-between; width: 100%;">
+                    <p style="margin: 2pt 0; width:50%;"><strong>Pojazd:</strong> ${car.brand}</p>
+                    <p style="margin: 2pt 0; width:50%;"><strong>Data Wydania:</strong> ${car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : new Date().toLocaleDateString('pl-PL')}</p>
+                </div>
+                <div style="display:flex; justify-content:space-between; width: 100%;">
+                    <p style="margin: 2pt 0; width:50%;"><strong>Tablice:</strong> ${car.plateNum || '---'}</p>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">2. Wykonane Czynności</h2>
+                ${todoList}
+                ${extraHours ? `<p style="margin-top: 8pt;"><strong>Dodatkowo zalogowano Czas Pracy:</strong> ${extraHours} h</p>` : ''}
+            </div>
+
+            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">3. Uwagi i Diagnoza (dla Klienta)</h2>
+                <p style="margin: 0; white-space: pre-wrap;">${notes || '---'}</p>
+            </div>
+
+            <div style="margin-bottom: 20pt; page-break-inside: avoid;">
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">4. Dodatkowe Informacje / Zdjęcia Przed</h2>
+                ${beforePhotosHtml}
+            </div>
+
+            <div style="margin-bottom: 20pt; page-break-inside: avoid;">
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">5. Dokumentacja Końcowa / Zdjęcia Po</h2>
+                ${afterPhotosHtml}
+            </div>
+
+            <div style="margin-top: 50pt; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid;">
+                <div style="text-align: center; border-top: 1pt solid #333; padding-top: 5pt; width: 200pt;">
+                    <p style="margin: 0; font-size: 10pt; color: #333;">Podpis Wykonawcy (EcoCarPro)</p>
+                </div>
+                <div style="text-align: center; border-top: 1pt solid #333; padding-top: 5pt; width: 200pt;">
+                    <p style="margin: 0; font-size: 10pt; color: #333;">Podpis Właściciela Pojazdu</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(template);
+    template.style.position = 'fixed';
+    template.style.left = '-1000vw'; // Hide out of bounds
+
+    var opt = {
+        margin: 0,
+        filename: `Raport_EcoCarPro_${car.brand.replace(/\s+/g, '_')}_${car.plateNum || ''}.pdf`,
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'css', avoid: 'page-break-inside' }
+    };
+
+    showToast("Generowanie układu i zapisywanie PDF...", "info");
+
+    try {
+        await html2pdf().set(opt).from(template).save();
+        showToast("Pomyślnie wygenerowano PDF", "success");
+        reportModal.classList.remove('active');
+        document.body.removeChild(template);
+    } catch (err) {
+        showToast("Nie udało się pobrać PDF.", "error");
+        document.body.removeChild(template);
+    }
+});
 
 searchInput.addEventListener('input', (e) => {
     renderCars(e.target.value);
