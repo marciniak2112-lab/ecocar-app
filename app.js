@@ -140,6 +140,21 @@ function init() {
         };
     });
 
+    // Auto-logout after 5 reloads
+    let reloadCount = parseInt(localStorage.getItem('ecoCarReloadCount') || '0', 10);
+    reloadCount++;
+    if (reloadCount >= 5) {
+        localStorage.removeItem('ecoCarReloadCount');
+        // Reset current user so they have to login again next refresh (in memory)
+        // For now, if we reach 5, we just show login.
+        loginOverlay.style.display = 'flex';
+        appContainer.style.display = 'none';
+
+        showToast("Wylogowano automatycznie po 5 odświeżeniach strony.", "info");
+    } else {
+        localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
+    }
+
     // Login Logic
     loginBtn.onclick = async () => {
         const user = loginUserInput.value.trim();
@@ -148,10 +163,14 @@ function init() {
         // Case-insensitive check for user, but exact for password
         const isAdmin = user.toLowerCase() === 'admin' && pass === 'system02';
         const isTomek = user.toLowerCase() === 'tomek' && pass === 'tommar';
+        const isMonia = user.toLowerCase() === 'monia' && pass === 'wanda';
 
-        if (isAdmin || isTomek) {
+        if (isAdmin || isTomek || isMonia) {
             // Standardize username for display
-            currentUser = isAdmin ? 'Admin' : 'Tomek';
+            currentUser = isAdmin ? 'Admin' : (isTomek ? 'Tomek' : 'Monia');
+
+            // Reset reload counter upon login
+            localStorage.setItem('ecoCarReloadCount', '0');
 
             loginOverlay.style.display = 'none';
             appContainer.style.display = 'block';
@@ -196,6 +215,12 @@ function updateUIForRole() {
         if (currentView === 'admin') {
             viewActiveBtn.click();
         }
+    }
+
+    if (currentUser === 'Monia') {
+        document.body.classList.add('monia-mode');
+    } else {
+        document.body.classList.remove('monia-mode');
     }
 }
 
@@ -448,7 +473,7 @@ function generateCarCardHtml(car) {
 
             ${car.plateNum ? `<div class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum}</div>` : ''}
             <h3>${car.brand}</h3>
-            <div class="car-info-row">
+            <div class="car-info-row price-blur-target">
                 <span class="label">Wartość Usługi</span>
                 <span class="val">${formatCurrency(car.price)}</span>
             </div>
@@ -571,6 +596,10 @@ function updateStats() {
     totalCarsEl.textContent = activeCars.length;
     const totalValue = activeCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     totalValueEl.textContent = formatCurrency(totalValue);
+
+    // Additional classes for blur targeting
+    totalValueEl.parentElement.classList.add('price-blur-target');
+    archiveTotalValueEl.parentElement.classList.add('price-blur-target');
 
     // Update label in stats too if needed
     const valLabel = document.querySelector('.stats-overview .stat-card:last-child .label');
@@ -712,6 +741,11 @@ function editCar(id) {
 }
 
 function openReportModal(id) {
+    if (currentUser === 'Monia') {
+        showToast("Tylko Admin i Tomek posiadają uprawnienia do tworzenia raportów.", "error");
+        return;
+    }
+
     const car = cars.find(c => c.id === id);
     if (!car) return;
     document.getElementById('report-car-id').value = id;
