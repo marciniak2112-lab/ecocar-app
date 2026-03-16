@@ -783,6 +783,7 @@ reportForm.addEventListener('submit', async (e) => {
 
     let template = document.createElement('div');
     template.style.padding = '30pt';
+    template.style.width = '800px';
     template.style.fontFamily = 'Outfit, sans-serif';
     template.style.color = '#000';
     template.style.backgroundColor = '#fff';
@@ -853,19 +854,11 @@ reportForm.addEventListener('submit', async (e) => {
         </div>
     `;
 
-    document.body.appendChild(template);
-    template.style.position = 'absolute';
-    template.style.top = '0';
-    template.style.left = '0';
-    template.style.opacity = '0';
-    template.style.pointerEvents = 'none';
-    template.style.zIndex = '-9999';
-
     var opt = {
         margin: 0,
         filename: `Raport_EcoCarPro_${car.brand.replace(/\s+/g, '_')}_${car.plateNum || ''}.pdf`,
         image: { type: 'jpeg', quality: 0.96 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: 'css', avoid: 'page-break-inside' }
     };
@@ -876,10 +869,8 @@ reportForm.addEventListener('submit', async (e) => {
         await html2pdf().set(opt).from(template).save();
         showToast("Pomyślnie wygenerowano PDF", "success");
         reportModal.classList.remove('active');
-        document.body.removeChild(template);
     } catch (err) {
         showToast("Nie udało się pobrać PDF.", "error");
-        document.body.removeChild(template);
     }
 });
 
