@@ -405,6 +405,7 @@ function renderArchiveRows(filteredCars) {
     // Calculate Total for filtered archive
     const totalArchiveValue = filteredCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
+    archiveTotalValueEl.parentElement.classList.add('price-blur-target');
 
     let html = `
         <div class="archive-container">
@@ -508,6 +509,10 @@ function generateCarCardHtml(car) {
                 <span class="val worker-tag">${car.worker}</span>
             </div>
             ` : ''}
+
+            <div class="car-info-row added-by-row" style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); padding-top: 8px; border-top: 1px dotted var(--border-color);">
+                <span>Dodane przez: <strong style="color: var(--primary-green);">${car.addedBy || 'System'}</strong></span>
+            </div>
             
             ${car.todo && car.todo.length > 0 ? `
             <div class="todo-list-preview">
@@ -700,7 +705,8 @@ carForm.addEventListener('submit', async (e) => {
         priority: document.getElementById('car-priority').checked,
         archived: id ? (cars.find(c => c.id === id).archived || false) : false,
         status: id ? (cars.find(c => c.id === id).status || 'przyjedzie') : 'przyjedzie',
-        dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString()
+        dateAdded: id ? cars.find(c => c.id === id).dateAdded : new Date().toISOString(),
+        addedBy: id ? (cars.find(c => c.id === id).addedBy || currentUser) : currentUser
     };
 
     try {

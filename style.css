@@ -1226,14 +1226,9 @@ body.monia-mode::after {
     background: radial-gradient(circle, rgba(236, 72, 153, 0.15), transparent 70%);
 }
 
-body.monia-mode .price-blur-target .val {
-    filter: blur(5px);
-    pointer-events: none;
-    user-select: none;
-}
-
-body.monia-mode .value {
-    filter: blur(6px);
+body.monia-mode .price-blur-target .val,
+body.monia-mode .price-value {
+    filter: blur(6px) !important;
     pointer-events: none;
     user-select: none;
 }
