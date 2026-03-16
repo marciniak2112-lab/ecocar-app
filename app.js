@@ -716,8 +716,48 @@ function openReportModal(id) {
     if (!car) return;
     document.getElementById('report-car-id').value = id;
     reportForm.reset();
+
+    // Check if Ceramika in todo
+    const hasCeramic = (car.todo || []).some(item => item.toLowerCase().includes('ceramika'));
+    const ceramicGroup = document.getElementById('ceramic-options-group');
+    if (hasCeramic) {
+        ceramicGroup.style.display = 'block';
+    } else {
+        ceramicGroup.style.display = 'none';
+        document.getElementById('report-ceramic').value = 'Brak (Inna)';
+    }
+
     reportModal.classList.add('active');
 }
+
+document.getElementById('btn-generate-ai').addEventListener('click', () => {
+    const keywords = document.getElementById('report-keywords').value.trim();
+    if (!keywords) {
+        showToast("Wpisz najpierw słowa kluczowe!", "info");
+        return;
+    }
+
+    const id = document.getElementById('report-car-id').value;
+    const car = cars.find(c => c.id === id);
+    if (!car) return;
+
+    const ceramic = document.getElementById('report-ceramic').value;
+    let ceramicText = '';
+    if (ceramic && ceramic !== 'Brak (Inna)') {
+        ceramicText = ` W celu długotrwałego zabezpieczenia lakieru i nadania mu unikalnego blasku, zaaplikowano wysokiej klasy powłokę ceramiczną marki ${ceramic}. Zapewni to długoterminową odporność i łatwość pielęgnacji przez wiele lat.`;
+    }
+
+    const sentences = [
+        `W pojeździe marki ${car.brand} wykonano serię zaawansowanych usług z zakresu profesjonalnego Auto Detailingu.`,
+        `Główne czynności obejmowały: ${keywords.toLowerCase()}.`,
+        `Wszelkie prace zostały przeprowadzone z użyciem profesjonalnych i w pełni bezpiecznych środków najwyższej jakości.`,
+        `${ceramicText}`,
+        `Przeprowadzone zabiegi w kluczowy sposób poprawiły wizualny i fizyczny stan pojazdu, skutecznie podnosząc jego walory estetyczne i ułatwiając bieżące utrzymanie perfekcyjnego stanu.`
+    ];
+
+    document.getElementById('report-notes').value = sentences.join(' ');
+    showToast("Pomyślnie wygenerowano opis dzięki słowom kluczowym!", "success");
+});
 
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -735,6 +775,7 @@ reportForm.addEventListener('submit', async (e) => {
     if (!car) return;
 
     const extraHours = document.getElementById('report-hours').value;
+    const ceramicBrand = document.getElementById('report-ceramic') ? document.getElementById('report-ceramic').value : 'Brak (Inna)';
     const notes = document.getElementById('report-notes').value;
 
     const beforeFiles = document.getElementById('report-photos-before').files;
@@ -782,12 +823,13 @@ reportForm.addEventListener('submit', async (e) => {
             <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
                 <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">2. Wykonane Czynności</h2>
                 ${todoList}
-                ${extraHours ? `<p style="margin-top: 8pt;"><strong>Dodatkowo zalogowano Czas Pracy:</strong> ${extraHours} h</p>` : ''}
+                ${ceramicBrand && ceramicBrand !== 'Brak (Inna)' ? `<p style="margin-top: 8pt;"><strong>Zaaplikowana Powłoka Ceramiczna:</strong> ${ceramicBrand}</p>` : ''}
+                ${extraHours ? `<p style="margin-top: 8pt;"><strong>Czas Trwania Usługi (Godzin):</strong> ${extraHours} h</p>` : ''}
             </div>
 
             <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">3. Uwagi i Diagnoza (dla Klienta)</h2>
-                <p style="margin: 0; white-space: pre-wrap;">${notes || '---'}</p>
+                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">3. Podsumowanie i Opis Usługi</h2>
+                <p style="margin: 0; white-space: pre-wrap; line-height: 1.5;">${notes || '---'}</p>
             </div>
 
             <div style="margin-bottom: 20pt; page-break-inside: avoid;">
@@ -812,8 +854,12 @@ reportForm.addEventListener('submit', async (e) => {
     `;
 
     document.body.appendChild(template);
-    template.style.position = 'fixed';
-    template.style.left = '-1000vw'; // Hide out of bounds
+    template.style.position = 'absolute';
+    template.style.top = '0';
+    template.style.left = '0';
+    template.style.opacity = '0';
+    template.style.pointerEvents = 'none';
+    template.style.zIndex = '-9999';
 
     var opt = {
         margin: 0,

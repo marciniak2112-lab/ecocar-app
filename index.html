@@ -257,12 +257,33 @@
             <form id="report-form">
                 <input type="hidden" id="report-car-id">
                 <div class="form-group">
-                    <label for="report-hours">Dodatkowe roboczogodziny</label>
+                    <label for="report-hours">Ile godzin nam to zeszło</label>
                     <input type="number" id="report-hours" placeholder="np. 5">
                 </div>
-                <div class="form-group">
-                    <label for="report-notes">Dodatkowe uwagi dla klienta</label>
-                    <textarea id="report-notes" rows="3" placeholder="Zauważyliśmy..."></textarea>
+                <div class="form-group" id="ceramic-options-group" style="display: none;">
+                    <label for="report-ceramic">Marka nakładanej Ceramiki</label>
+                    <select id="report-ceramic" class="form-select">
+                        <option value="Brak (Inna)">Brak / Inna</option>
+                        <option value="Aqua">Aqua</option>
+                        <option value="Gtechniq">Gtechniq</option>
+                        <option value="Waxoyl">Waxoyl</option>
+                        <option value="CarPro">CarPro</option>
+                        <option value="Kisho">Kisho</option>
+                    </select>
+                </div>
+                <div class="form-group ai-generator-box"
+                    style="background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 10px; border: 1px dashed rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
+                    <label for="report-keywords" style="color: var(--primary-green); font-weight: 600;">Wygeneruj
+                        profesjonalny opis (Symulacja AI)</label>
+                    <input type="text" id="report-keywords"
+                        placeholder="Wpisz parę słów: np. pranie foteli, usunięcie rys, twardy wosk..."
+                        style="margin-bottom: 10px;">
+                    <button type="button" id="btn-generate-ai" class="btn-secondary"
+                        style="width: 100%; border-color: var(--primary-green); color: var(--primary-green); font-weight: bold; margin-bottom: 10px;">✨
+                        Generuj Opis AI</button>
+                    <label for="report-notes">Gotowy opis raportu na podstawie słów kluczowych</label>
+                    <textarea id="report-notes" rows="4"
+                        placeholder="Opis usługi zostanie tutaj wygenerowany..."></textarea>
                 </div>
                 <div class="form-group">
                     <label>Zdjęcia PRZED</label>
