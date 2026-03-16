@@ -791,10 +791,10 @@ reportForm.addEventListener('submit', async (e) => {
     template.style.lineHeight = '1.6';
 
     const renderPhotos = async (files) => {
-        let photosHtml = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 15pt;">';
+        let photosHtml = '<div style="display:flex; flex-wrap:wrap; gap:10pt; justify-content: flex-start;">';
         for (let file of files) {
             const base64 = await fileToBase64(file);
-            photosHtml += `<img src="${base64}" style="height: 150pt; width: auto; max-width: 100%; object-fit: contain; border-radius: 4pt;">`;
+            photosHtml += `<img src="${base64}" style="max-height: 200pt; max-width: 48%; object-fit: contain; border-radius: 4pt; page-break-inside: avoid;">`;
         }
         photosHtml += '</div>';
         return photosHtml;
@@ -833,12 +833,12 @@ reportForm.addEventListener('submit', async (e) => {
                 <p style="margin: 0; white-space: pre-wrap; line-height: 1.5;">${notes || '---'}</p>
             </div>
 
-            <div style="margin-bottom: 20pt; page-break-inside: avoid;">
+            <div style="margin-bottom: 20pt; page-break-inside: avoid; clear: both;">
                 <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">4. Dodatkowe Informacje / Zdjęcia Przed</h2>
                 ${beforePhotosHtml}
             </div>
 
-            <div style="margin-bottom: 20pt; page-break-inside: avoid;">
+            <div style="margin-bottom: 20pt; page-break-inside: avoid; clear: both;">
                 <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">5. Dokumentacja Końcowa / Zdjęcia Po</h2>
                 ${afterPhotosHtml}
             </div>
@@ -855,12 +855,12 @@ reportForm.addEventListener('submit', async (e) => {
     `;
 
     var opt = {
-        margin: 0,
+        margin: [30, 30, 30, 30],
         filename: `Raport_EcoCarPro_${car.brand.replace(/\s+/g, '_')}_${car.plateNum || ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.96 },
+        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'css', avoid: 'page-break-inside' }
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['h2', 'h1', '.avoid-break', 'img', 'div[style*="page-break-inside: avoid"]'] }
     };
 
     showToast("Generowanie układu i zapisywanie PDF...", "info");
