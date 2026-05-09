@@ -294,7 +294,8 @@ async function logAction(actionText) {
 }
 
 function updateUIForRole() {
-    if (currentUser === 'Admin') {
+    const role = (currentUser || '').toLowerCase();
+    if (role === 'admin') {
         viewAdminBtn.style.display = 'block';
     } else {
         viewAdminBtn.style.display = 'none';
@@ -304,7 +305,7 @@ function updateUIForRole() {
         }
     }
 
-    if (currentUser === 'Monia') {
+    if (role === 'monia') {
         document.body.classList.add('monia-mode');
     } else {
         document.body.classList.remove('monia-mode');
@@ -341,6 +342,10 @@ async function loadAdminData() {
         const lockRef = doc(db, 'settings', userId + '_lock');
         const lockSnap = await getDoc(lockRef);
         const isLocked = lockSnap.exists() && lockSnap.data().locked;
+        
+        // Remove existing action buttons to prevent duplication
+        const existingBtn = card.querySelector('.unlock-btn');
+        if (existingBtn) existingBtn.remove();
         
         const actionBtn = document.createElement('button');
         actionBtn.className = isLocked ? 'unlock-btn' : 'unlock-btn suspend-btn';
