@@ -202,10 +202,10 @@ function init() {
             'admin': 'system02',
             'tomek': 'tommar',
             'monia': 'wanda',
-            'adam': '123456789',
-            'michal': '987654321',
-            'lukasz': '456789123',
-            'nastka': '789123456'
+            'adam': '767211439',
+            'michal': '192837465',
+            'lukasz': '564738291',
+            'nastka': '908172635'
         };
 
         if (validUsers[canonicalUser]) {
@@ -378,10 +378,10 @@ async function loadAdminData() {
             'admin': 'system02',
             'tomek': 'tommar',
             'monia': 'wanda',
-            'adam': '123456789',
-            'michal': '987654321',
-            'lukasz': '456789123',
-            'nastka': '789123456'
+            'adam': '767211439',
+            'michal': '192837465',
+            'lukasz': '564738291',
+            'nastka': '908172635'
         };
         
         const pass = validUsers[userId];
