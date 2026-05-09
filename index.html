@@ -31,6 +31,7 @@
                 <input type="password" id="login-password" placeholder="Wpisz hasło">
             </div>
             <button id="login-btn" class="btn-primary" style="width: 100%">Zaloguj</button>
+            <div id="locked-msg" style="display: none;"></div>
         </div>
     </div>
 
@@ -135,6 +136,14 @@
 
             <div id="admin-section" class="admin-section" style="display: none;">
                 <div class="users-status-grid">
+                    <div id="status-admin" class="user-status-card glass">
+                        <div class="user-avatar" style="background: #ef4444;">A</div>
+                        <div class="user-info">
+                            <h3>Administrator</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        </div>
+                    </div>
                     <div id="status-tomek" class="user-status-card glass">
                         <div class="user-avatar">T</div>
                         <div class="user-info">

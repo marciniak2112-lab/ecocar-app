@@ -62,6 +62,7 @@ const loginOverlay = document.getElementById('login-overlay');
 const loginBtn = document.getElementById('login-btn');
 const loginUserInput = document.getElementById('login-user');
 const loginPassInput = document.getElementById('login-password');
+const lockedMsgEl = document.getElementById('locked-msg');
 const helpBtn = document.getElementById('help-btn');
 const helpModal = document.getElementById('help-modal');
 const closeHelpModalBtn = document.getElementById('close-help-modal');
@@ -101,10 +102,20 @@ function init() {
         localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
         // If we have a saved user, show the app
         if (currentUser) {
-            loginOverlay.style.display = 'none';
-            appContainer.style.display = 'block';
-            loggedUserNameEl.textContent = currentUser;
-            updateUIForRole();
+            const checkLock = async () => {
+                const lockDoc = await getDoc(doc(db, 'settings', currentUser.toLowerCase() + '_lock'));
+                if (lockDoc.exists() && lockDoc.data().locked) {
+                    localStorage.removeItem('ecoCarUser');
+                    currentUser = '';
+                    location.reload();
+                    return;
+                }
+                loginOverlay.style.display = 'none';
+                appContainer.style.display = 'block';
+                loggedUserNameEl.textContent = currentUser;
+                updateUIForRole();
+            };
+            checkLock();
         }
     }
 
@@ -176,16 +187,28 @@ function init() {
             return;
         }
 
+        const canonicalUser = userVal.toLowerCase();
+
+        // Check if locked
+        try {
+            const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
+            if (lockDoc.exists() && lockDoc.data().locked) {
+                showLockedMessage(lockDoc.data().suspended || false);
+                return;
+            }
+        } catch (e) { console.error("Check lock error", e); }
+
         const validUsers = {
             'admin': 'system02',
             'tomek': 'tommar',
             'monia': 'wanda'
         };
 
-        const canonicalUser = userVal.toLowerCase();
-
         if (validUsers[canonicalUser]) {
             if (validUsers[canonicalUser] === passVal) {
+                // Reset failed attempts on success
+                localStorage.removeItem('ecoCarFailedAttempts');
+
                 currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
                 localStorage.setItem('ecoCarUser', currentUser);
                 localStorage.setItem('ecoCarReloadCount', '0');
@@ -197,25 +220,66 @@ function init() {
 
                 loginPassInput.value = '';
                 loginUserInput.value = '';
+                lockedMsgEl.style.display = 'none';
 
-                if (currentUser === 'Tomek' || currentUser === 'Monia') {
+                if (currentUser === 'Tomek' || currentUser === 'Monia' || currentUser === 'Admin') {
                     try {
                         const settingKey = currentUser.toLowerCase() + '_login';
                         await setDoc(doc(db, 'settings', settingKey), {
                             lastLogin: new Date().toISOString()
-                        });
+                        }, { merge: true });
                     } catch (e) { console.error("Update login error", e); }
                 }
                 logAction(`Zalogowano użytkownika: ${currentUser}`);
                 updateUIForRole();
                 renderCars();
             } else {
-                showToast("Błędne hasło dla tego użytkownika", "error");
+                handleFailedLogin(canonicalUser);
             }
         } else {
-            showToast("Użytkownik nie istnieje w systemie", "error");
+            handleFailedLogin(canonicalUser);
         }
     };
+
+    function showLockedMessage(isSuspended = false) {
+        const title = isSuspended ? "Konto Zawieszone" : "Konto Zablokowane";
+        const message = isSuspended ? "Twoje konto zostało zawieszone przez administratora." : "Przekroczono limit prób logowania. Skontaktuj się z administratorem, aby odblokować dostęp:";
+        
+        lockedMsgEl.innerHTML = `
+            <div class="locked-container" style="${isSuspended ? 'border-color: #f59e0b; background: rgba(245, 158, 11, 0.1);' : ''}">
+                <h3 style="${isSuspended ? 'color: #f59e0b;' : ''}">${title}</h3>
+                <p>${message}</p>
+                <a href="tel:+48605595049" class="phone-link" style="${isSuspended ? 'color: #f59e0b;' : ''}">📞 605 595 049</a>
+            </div>
+        `;
+        lockedMsgEl.style.display = 'block';
+        loginBtn.style.display = 'none';
+        loginUserInput.disabled = true;
+        loginPassInput.disabled = true;
+        
+        if (isSuspended) {
+            showToast("Twoje konto zostało zawieszone!", "error");
+        }
+    }
+
+    async function handleFailedLogin(username) {
+        let attempts = parseInt(localStorage.getItem('ecoCarFailedAttempts') || '0', 10);
+        attempts++;
+        localStorage.setItem('ecoCarFailedAttempts', attempts.toString());
+
+        if (attempts >= 3) {
+            try {
+                await setDoc(doc(db, 'settings', username + '_lock'), {
+                    locked: true,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (e) { console.error("Lock error", e); }
+            showLockedMessage();
+            showToast("Konto zostało zablokowane!", "error");
+        } else {
+            showToast(`Błędne dane! Pozostało prób: ${3 - attempts}`, "error");
+        }
+    }
     updateUIForRole();
 }
 
@@ -272,8 +336,36 @@ async function loadAdminData() {
                 statusEl.className = 'offline';
             }
         }
+
+        // Check lock status
+        const lockRef = doc(db, 'settings', userId + '_lock');
+        const lockSnap = await getDoc(lockRef);
+        const isLocked = lockSnap.exists() && lockSnap.data().locked;
+        
+        const actionBtn = document.createElement('button');
+        actionBtn.className = isLocked ? 'unlock-btn' : 'unlock-btn suspend-btn';
+        if (!isLocked) {
+            actionBtn.style.background = '#f59e0b'; // Orange for suspend
+        }
+        actionBtn.textContent = isLocked ? 'Odblokuj Konto' : 'Zawieś Konto';
+        
+        actionBtn.onclick = async () => {
+            if (isLocked) {
+                await setDoc(lockRef, { locked: false, suspended: false });
+                showToast(`Odblokowano użytkownika ${userId}`, "success");
+            } else {
+                const confirmed = await showConfirm(`Czy na pewno chcesz zawiesić konto użytkownika ${userId}?`, 'ZAWIEŚ', 'ANULUJ', true);
+                if (confirmed) {
+                    await setDoc(lockRef, { locked: true, suspended: true, timestamp: new Date().toISOString() });
+                    showToast(`Zawieszono użytkownika ${userId}`, "error");
+                }
+            }
+            loadAdminData();
+        };
+        card.querySelector('.user-info').appendChild(actionBtn);
     };
 
+    await updateStatusCard('admin', 'status-admin'); // If status-admin exists
     await updateStatusCard('tomek', 'status-tomek');
     await updateStatusCard('monia', 'status-monia');
 
