@@ -201,7 +201,11 @@ function init() {
         const validUsers = {
             'admin': 'system02',
             'tomek': 'tommar',
-            'monia': 'wanda'
+            'monia': 'wanda',
+            'adam': '123456789',
+            'michal': '987654321',
+            'lukasz': '456789123',
+            'nastka': '789123456'
         };
 
         if (validUsers[canonicalUser]) {
@@ -368,13 +372,52 @@ async function loadAdminData() {
             loadAdminData();
         };
         card.querySelector('.user-info').appendChild(actionBtn);
+
+        // Password Preview (Zaszyfrowany/Zamaskowany podgląd)
+        const validUsers = {
+            'admin': 'system02',
+            'tomek': 'tommar',
+            'monia': 'wanda',
+            'adam': '123456789',
+            'michal': '987654321',
+            'lukasz': '456789123',
+            'nastka': '789123456'
+        };
+        
+        const pass = validUsers[userId];
+        if (pass) {
+            const existingPass = card.querySelector('.pass-preview');
+            if (existingPass) existingPass.remove();
+
+            const passContainer = document.createElement('div');
+            passContainer.className = 'pass-preview';
+            passContainer.style.fontSize = '0.75rem';
+            passContainer.style.marginTop = '10px';
+            passContainer.style.padding = '4px 8px';
+            passContainer.style.background = 'rgba(255,255,255,0.05)';
+            passContainer.style.borderRadius = '6px';
+            passContainer.style.color = 'var(--text-muted)';
+            
+            const maskedPass = '●'.repeat(pass.length);
+            passContainer.innerHTML = `🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span> <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-left:5px;">POKAŻ</button>`;
+            
+            passContainer.querySelector('.btn-show-pass').onclick = (e) => {
+                const valEl = passContainer.querySelector('.pass-val');
+                const isMasked = valEl.textContent.includes('●');
+                valEl.textContent = isMasked ? valEl.dataset.real : '●'.repeat(pass.length);
+                e.target.textContent = isMasked ? 'UKRYJ' : 'POKAŻ';
+            };
+            
+            card.querySelector('.user-info').appendChild(passContainer);
+        }
     };
 
-    await updateStatusCard('admin', 'status-admin'); // If status-admin exists
-    await updateStatusCard('tomek', 'status-tomek');
-    await updateStatusCard('monia', 'status-monia');
+    const userIds = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
+    for (const userId of userIds) {
+        await updateStatusCard(userId, 'status-' + userId);
+    }
 
-    // Load last 10 logs for Tomek and Monia only
+    // Load last 10 logs for everyone except Admin maybe? Or just keep current filter
     const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
     const logsSnap = await getDocs(logsQ);
 
