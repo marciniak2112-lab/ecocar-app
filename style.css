@@ -1466,6 +1466,95 @@ body.monia-mode .price-value {
 }
 
 @media (max-width: 600px) {
+    #app {
+        padding: 0.8rem;
+    }
+
+    header {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .header-nav {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        justify-content: flex-start;
+    }
+
+    .view-tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        width: max-content;
+    }
+
+    .tab-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .header-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    #add-car-btn {
+        grid-column: span 2;
+        width: 100%;
+    }
+
+    .user-pill {
+        grid-column: span 2;
+        justify-content: space-between;
+    }
+
+    .stats-overview {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .stat-card {
+        padding: 1.2rem;
+    }
+
+    .cars-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .car-card {
+        padding: 1.2rem;
+    }
+
+    .users-status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .user-status-card {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .user-avatar {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+    }
+
+    .modal-content {
+        padding: 1.2rem;
+        width: 95%;
+        margin: 5px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
     #toast-container {
         bottom: 12px;
         right: 12px;
@@ -1474,5 +1563,28 @@ body.monia-mode .price-value {
 
     .toast {
         min-width: 0;
+        padding: 10px 15px;
+        font-size: 0.85rem;
+    }
+
+    .archive-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .period-filters {
+        justify-content: space-between;
+    }
+
+    .period-btn {
+        padding: 8px 5px;
+        flex: 1;
+        font-size: 0.75rem;
+        text-align: center;
+    }
+
+    .archive-stats {
+        align-items: center;
     }
 }
