@@ -1588,22 +1588,6 @@ body.monia-mode .price-value {
         align-items: center;
     }
 }
-/* GitHub News Modal Styles */
-.news-list {
-    max-height: 400px;
-    overflow-y: auto;
-    padding-right: 5px;
-}
-
-.news-item {
-    transition: all 0.2s ease;
-}
-
-.news-item:hover {
-    transform: scale(1.02);
-    border-color: var(--primary-green);
-    background: rgba(16, 185, 129, 0.05) !important;
-}
 
 /* Mobile Responsiveness Improvements */
 @media (max-width: 600px) {

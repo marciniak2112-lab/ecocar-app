@@ -86,10 +86,7 @@ const reportModal = document.getElementById('report-modal');
 const reportForm = document.getElementById('report-form');
 const closeReportModalBtn = document.getElementById('close-report-modal');
 const reportCarIdInput = document.getElementById('report-car-id');
-const newsBtn = document.getElementById('news-btn');
-const newsModal = document.getElementById('news-modal');
-const closeNewsModalBtn = document.getElementById('close-news-modal');
-const newsList = document.getElementById('news-list');
+
 
 // Calendar DOM Elements
 const calendarMonthsRow = document.getElementById('calendar-months-row');
@@ -482,14 +479,7 @@ function init() {
         };
     }
 
-    // News logic
-    newsBtn.onclick = () => {
-        newsModal.classList.add('active');
-        fetchGitHubNews();
-    };
-    closeNewsModalBtn.onclick = () => {
-        newsModal.classList.remove('active');
-    };
+
 }
 
 async function logAction(actionText) {
@@ -1052,7 +1042,6 @@ window.onclick = (event) => {
     if (event.target === helpModal) helpModal.classList.remove('active');
     if (event.target === confirmModal) confirmModal.classList.remove('active');
     if (event.target === reportModal) reportModal.classList.remove('active');
-    if (event.target === newsModal) newsModal.classList.remove('active');
 };
 
 if (closeReportModalBtn) {
@@ -1344,47 +1333,7 @@ searchInput.addEventListener('input', (e) => {
     renderCars(e.target.value);
 });
 
-async function fetchGitHubNews() {
-    newsList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Ładowanie aktualności z repozytorium...</p>';
 
-    try {
-        const response = await fetch('https://api.github.com/repos/marciniak2112-lab/ecocar-app/commits?per_page=5');
-        if (!response.ok) throw new Error('Błąd pobierania danych z GitHub');
-
-        const commits = await response.json();
-
-        if (commits.length === 0) {
-            newsList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Brak ostatnich aktualizacji.</p>';
-            return;
-        }
-
-        newsList.innerHTML = commits.map(c => {
-            const date = new Date(c.commit.author.date).toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            const message = c.commit.message.split('\n')[0];
-            const author = c.commit.author.name;
-            const avatar = c.author ? c.author.avatar_url : 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
-
-            return `
-                <div class="news-item glass" style="margin-bottom: 10px; padding: 12px; display: flex; gap: 12px; align-items: flex-start;">
-                    <img src="${avatar}" alt="${author}" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-color);">
-                    <div class="news-content" style="flex: 1;">
-                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary-green); margin-bottom: 4px;">${author} <span style="font-weight: 400; color: var(--text-muted); font-size: 0.75rem;">• ${date}</span></div>
-                        <div style="font-size: 0.9rem; color: var(--text-main); line-height: 1.4;">${message}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    } catch (error) {
-        console.error('GitHub fetch error:', error);
-        newsList.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px;">Nie udało się pobrać aktualności. Spróbuj później.</p>`;
-    }
-}
 
 // Database-backed user config helpers
 async function getUserConfig(username) {
