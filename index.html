@@ -44,6 +44,7 @@
                 <div class="view-tabs">
                     <button id="view-active" class="tab-btn active">Aktywne</button>
                     <button id="view-archive" class="tab-btn">Archiwum</button>
+                    <button id="view-calendar" class="tab-btn">Kalendarz</button>
                     <button id="view-admin" class="tab-btn">Panel Admin</button>
                 </div>
             </div>
@@ -75,6 +76,15 @@
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                     Dodaj Auto
+                </button>
+                <button id="news-btn" class="btn-secondary" title="Aktualności z GitHub">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                        </path>
+                    </svg>
+                    News
                 </button>
                 <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -134,30 +144,115 @@
                 </div>
             </div>
 
+            <div id="calendar-section" class="calendar-section" style="display: none;">
+                <div class="calendar-layout-container">
+                    <div class="calendar-grid-card glass">
+                        <div class="calendar-header-bar">
+                            <h3>📅 Kalendarz Pracy</h3>
+                            <div class="year-selector">
+                                <button type="button" id="calendar-prev-year" class="btn-icon">◀</button>
+                                <span id="calendar-current-year">2026</span>
+                                <button type="button" id="calendar-next-year" class="btn-icon">▶</button>
+                            </div>
+                        </div>
+                        <div class="months-scroll-container">
+                            <div class="months-row" id="calendar-months-row">
+                                <!-- 12 Month columns will be dynamically injected here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="timeline-panel-card glass" id="timeline-panel">
+                        <div class="timeline-header">
+                            <h3>⏱️ Oś czasu: <span id="selected-day-label">Wybierz dzień</span></h3>
+                        </div>
+                        <div class="timeline-events-container" id="timeline-events">
+                            <p class="select-day-prompt">Kliknij dowolny dzień w kalendarzu, aby wyświetlić i zaplanować pojazdy.</p>
+                        </div>
+                        <div class="timeline-add-form" id="timeline-add-form" style="display: none;">
+                            <hr style="border-color: var(--border-color); margin: 15px 0;">
+                            <h4>➕ Zaplanuj Pojazd</h4>
+                            <div class="tab-selector" style="display: flex; gap: 8px; margin: 10px 0;">
+                                <button type="button" id="tab-assign-panel" class="btn-status active" style="flex: 1; padding: 6px;">Z panelu</button>
+                                <button type="button" id="tab-assign-manual" class="btn-status" style="flex: 1; padding: 6px;">Wpisz ręcznie</button>
+                            </div>
+                            <div class="form-group" id="group-assign-panel">
+                                <label>Pojazd z bazy</label>
+                                <select id="assign-car-select" class="form-select">
+                                    <option value="">Wybierz pojazd...</option>
+                                    <!-- Options will be injected -->
+                                </select>
+                            </div>
+                            <div class="form-group" id="group-assign-manual" style="display: none;">
+                                <label>Model / Wpis (np. Audi A4 - Klient X)</label>
+                                <input type="text" id="assign-car-manual-input" placeholder="Wpisz nazwę pojazdu lub klienta">
+                            </div>
+                            <div class="form-grid" style="margin-bottom: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Godzina (opcjonalnie)</label>
+                                    <input type="time" id="assign-car-time">
+                                </div>
+                            </div>
+                            <button type="button" id="btn-add-to-timeline" class="btn-submit" style="width: 100%;">Dodaj do Osi Czasu</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="admin-section" class="admin-section" style="display: none;">
                 <div class="users-status-grid">
-                    <div id="status-admin" class="user-status-card glass">
-                        <div class="user-avatar" style="background: #ef4444;">A</div>
-                        <div class="user-info">
-                            <h3>Administrator</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                    <div id="status-tomek" class="user-status-card glass flex-column" style="display: flex; flex-direction: column; align-items: stretch; gap: 15px; padding: 1.5rem;">
+                        <div style="display: flex; align-items: center; gap: 1.5rem;">
+                            <div class="user-avatar">T</div>
+                            <div class="user-info">
+                                <h3>Tomasz</h3>
+                                <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                                <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                            </div>
+                        </div>
+                        <div class="account-mgmt-box" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                                <span class="label" style="color: var(--text-muted);">Konto zablokowane:</span>
+                                <span class="lock-status" id="tomek-lock-status" style="font-weight: 700; color: #10b981;">NIE</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                                <span class="label" style="color: var(--text-muted);">Próby logowania:</span>
+                                <span class="failed-attempts" id="tomek-failed-attempts" style="font-weight: 700;">0 / 3</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; margin: 5px 0;">
+                                <button type="button" id="btn-tomek-toggle-lock" class="btn-status" style="width: 100%; font-size: 0.75rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;">ZABLOKUJ KONTO</button>
+                            </div>
+                            <div class="form-group" style="margin: 0; display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="tomek-password-input" placeholder="Hasło" style="flex: 1; padding: 6px 10px; font-size: 0.85rem; height: 32px; border-radius: 6px;">
+                                <button type="button" id="btn-tomek-save-password" class="btn-primary" style="height: 32px; padding: 0 12px; font-size: 0.8rem; border-radius: 6px; box-shadow: none;">Zapisz</button>
+                            </div>
                         </div>
                     </div>
-                    <div id="status-tomek" class="user-status-card glass">
-                        <div class="user-avatar">T</div>
-                        <div class="user-info">
-                            <h3>Tomasz</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                    
+                    <div id="status-monia" class="user-status-card glass flex-column" style="display: flex; flex-direction: column; align-items: stretch; gap: 15px; padding: 1.5rem;">
+                        <div style="display: flex; align-items: center; gap: 1.5rem;">
+                            <div class="user-avatar" style="background: #ec4899; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);">M</div>
+                            <div class="user-info">
+                                <h3>Monika</h3>
+                                <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                                <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                            </div>
                         </div>
-                    </div>
-                    <div id="status-monia" class="user-status-card glass">
-                        <div class="user-avatar">M</div>
-                        <div class="user-info">
-                            <h3>Monika</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        <div class="account-mgmt-box" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                                <span class="label" style="color: var(--text-muted);">Konto zablokowane:</span>
+                                <span class="lock-status" id="monia-lock-status" style="font-weight: 700; color: #10b981;">NIE</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                                <span class="label" style="color: var(--text-muted);">Próby logowania:</span>
+                                <span class="failed-attempts" id="monia-failed-attempts" style="font-weight: 700;">0 / 3</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; margin: 5px 0;">
+                                <button type="button" id="btn-monia-toggle-lock" class="btn-status" style="width: 100%; font-size: 0.75rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;">ZABLOKUJ KONTO</button>
+                            </div>
+                            <div class="form-group" style="margin: 0; display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="monia-password-input" placeholder="Hasło" style="flex: 1; padding: 6px 10px; font-size: 0.85rem; height: 32px; border-radius: 6px;">
+                                <button type="button" id="btn-monia-save-password" class="btn-primary" style="height: 32px; padding: 0 12px; font-size: 0.8rem; border-radius: 6px; box-shadow: none;">Zapisz</button>
+                            </div>
                         </div>
                     </div>
                     <div id="status-adam" class="user-status-card glass">
@@ -376,6 +471,24 @@
                 <p><strong>Kontakt:</strong></p>
                 <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chrom@gmail.com</a></p>
                 <p>📞 <a href="tel:+48605595049">605 595 049</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- News Modal -->
+    <div id="news-modal" class="modal">
+        <div class="modal-content glass news-content">
+            <div class="modal-header">
+                <h2>Aktualności z GitHub</h2>
+                <button id="close-news-modal" class="btn-close">&times;</button>
+            </div>
+            <div id="news-list" class="news-list">
+                <p style="text-align: center; color: var(--text-muted); padding: 20px;">Ładowanie aktualności...</p>
+            </div>
+            <div class="news-footer" style="margin-top: 15px; text-align: right;">
+                <a href="https://github.com/marciniak2112-lab/ecocar-app/commits/main" target="_blank"
+                    style="color: var(--primary-green); font-size: 0.8rem; text-decoration: none; font-weight: 600;">Zobacz
+                    wszystko na GitHub →</a>
             </div>
         </div>
     </div>

@@ -32,12 +32,17 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const carsCol = collection(db, 'cars');
+const calendarCol = collection(db, 'calendar_events');
 
 // State Management
 let cars = [];
-let currentView = 'active'; // 'active', 'archive', or 'admin'
+let calendarEvents = [];
+let currentView = 'active'; // 'active', 'archive', 'calendar' or 'admin'
 let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', or 'Monia'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
+let selectedYear = new Date().getFullYear();
+let selectedDateStr = '';
+let assignMode = 'panel';
 
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
@@ -54,10 +59,11 @@ const sunIcon = document.getElementById('sun-icon');
 const moonIcon = document.getElementById('moon-icon');
 const viewActiveBtn = document.getElementById('view-active');
 const viewArchiveBtn = document.getElementById('view-archive');
+const viewCalendarBtn = document.getElementById('view-calendar');
 const viewAdminBtn = document.getElementById('view-admin');
 const adminSection = document.getElementById('admin-section');
+const calendarSection = document.getElementById('calendar-section');
 const logsList = document.getElementById('logs-list');
-const tomekLastLoginEl = document.getElementById('tomek-last-login');
 const loginOverlay = document.getElementById('login-overlay');
 const loginBtn = document.getElementById('login-btn');
 const loginUserInput = document.getElementById('login-user');
@@ -80,6 +86,27 @@ const reportModal = document.getElementById('report-modal');
 const reportForm = document.getElementById('report-form');
 const closeReportModalBtn = document.getElementById('close-report-modal');
 const reportCarIdInput = document.getElementById('report-car-id');
+const newsBtn = document.getElementById('news-btn');
+const newsModal = document.getElementById('news-modal');
+const closeNewsModalBtn = document.getElementById('close-news-modal');
+const newsList = document.getElementById('news-list');
+
+// Calendar DOM Elements
+const calendarMonthsRow = document.getElementById('calendar-months-row');
+const calendarCurrentYearEl = document.getElementById('calendar-current-year');
+const calendarPrevYearBtn = document.getElementById('calendar-prev-year');
+const calendarNextYearBtn = document.getElementById('calendar-next-year');
+const selectedDayLabel = document.getElementById('selected-day-label');
+const timelineEventsEl = document.getElementById('timeline-events');
+const timelineAddForm = document.getElementById('timeline-add-form');
+const tabAssignPanel = document.getElementById('tab-assign-panel');
+const tabAssignManual = document.getElementById('tab-assign-manual');
+const groupAssignPanel = document.getElementById('group-assign-panel');
+const groupAssignManual = document.getElementById('group-assign-manual');
+const assignCarSelect = document.getElementById('assign-car-select');
+const assignCarManualInput = document.getElementById('assign-car-manual-input');
+const assignCarTime = document.getElementById('assign-car-time');
+const btnAddToTimeline = document.getElementById('btn-add-to-timeline');
 
 // Initialize Listener - Real-time Sanpshot
 function init() {
@@ -126,6 +153,23 @@ function init() {
         renderCars();
         updateStats();
         updateCountdowns();
+        // Update select options if calendar open
+        if (selectedDateStr) {
+            const activeCars = cars.filter(c => !c.archived);
+            const val = assignCarSelect.value;
+            assignCarSelect.innerHTML = '<option value="">Wybierz pojazd...</option>' + 
+                activeCars.map(c => `<option value="${c.id}">${c.brand} [${c.plateNum || 'brak tablic'}]</option>`).join('');
+            assignCarSelect.value = val;
+        }
+    });
+
+    const calQ = query(calendarCol, orderBy('timestamp', 'desc'));
+    onSnapshot(calQ, (snapshot) => {
+        calendarEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderCalendar();
+        if (selectedDateStr) {
+            renderTimeline(selectedDateStr);
+        }
     });
 
     setInterval(updateCountdowns, 1000);
@@ -135,8 +179,10 @@ function init() {
         currentView = 'active';
         viewActiveBtn.classList.add('active');
         viewArchiveBtn.classList.remove('active');
+        viewCalendarBtn.classList.remove('active');
         viewAdminBtn.classList.remove('active');
         adminSection.style.display = 'none';
+        calendarSection.style.display = 'none';
         archiveControls.style.display = 'none';
         carsGrid.style.display = 'grid';
         renderCars(searchInput.value);
@@ -146,19 +192,36 @@ function init() {
         currentView = 'archive';
         viewActiveBtn.classList.remove('active');
         viewArchiveBtn.classList.add('active');
+        viewCalendarBtn.classList.remove('active');
         viewAdminBtn.classList.remove('active');
         adminSection.style.display = 'none';
+        calendarSection.style.display = 'none';
         archiveControls.style.display = 'flex';
         carsGrid.style.display = 'grid';
         renderCars(searchInput.value);
+    };
+
+    viewCalendarBtn.onclick = () => {
+        currentView = 'calendar';
+        viewActiveBtn.classList.remove('active');
+        viewArchiveBtn.classList.remove('active');
+        viewCalendarBtn.classList.add('active');
+        viewAdminBtn.classList.remove('active');
+        adminSection.style.display = 'none';
+        calendarSection.style.display = 'block';
+        archiveControls.style.display = 'none';
+        carsGrid.style.display = 'none';
+        renderCalendar();
     };
 
     viewAdminBtn.onclick = () => {
         currentView = 'admin';
         viewActiveBtn.classList.remove('active');
         viewArchiveBtn.classList.remove('active');
+        viewCalendarBtn.classList.remove('active');
         viewAdminBtn.classList.add('active');
         adminSection.style.display = 'block';
+        calendarSection.style.display = 'none';
         archiveControls.style.display = 'none';
         carsGrid.style.display = 'none';
         loadAdminData();
@@ -188,60 +251,67 @@ function init() {
         }
 
         const canonicalUser = userVal.toLowerCase();
+        const allowedUsers = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
 
-        // Check if locked
-        try {
-            const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
-            if (lockDoc.exists() && lockDoc.data().locked) {
-                showLockedMessage(lockDoc.data().suspended || false);
-                return;
-            }
-        } catch (e) { console.error("Check lock error", e); }
-
-        const validUsers = {
-            'admin': 'system02',
-            'tomek': 'tommar',
-            'monia': 'wanda',
-            'adam': '767211439',
-            'michal': '192837465',
-            'lukasz': '564738291',
-            'nastka': '908172635'
-        };
-
-        if (validUsers[canonicalUser]) {
-            if (validUsers[canonicalUser] === passVal) {
-                // Reset failed attempts on success
-                localStorage.removeItem('ecoCarFailedAttempts');
-
-                currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
-                localStorage.setItem('ecoCarUser', currentUser);
-                localStorage.setItem('ecoCarReloadCount', '0');
-
-                loginOverlay.style.display = 'none';
-                appContainer.style.display = 'block';
-                loggedUserNameEl.textContent = currentUser;
-                showToast(`Zalogowano jako ${currentUser}`, "success");
-
-                loginPassInput.value = '';
-                loginUserInput.value = '';
-                lockedMsgEl.style.display = 'none';
-
-                if (currentUser === 'Tomek' || currentUser === 'Monia' || currentUser === 'Admin') {
-                    try {
-                        const settingKey = currentUser.toLowerCase() + '_login';
-                        await setDoc(doc(db, 'settings', settingKey), {
-                            lastLogin: new Date().toISOString()
-                        }, { merge: true });
-                    } catch (e) { console.error("Update login error", e); }
+        if (allowedUsers.includes(canonicalUser)) {
+            try {
+                const config = await getUserConfig(canonicalUser);
+                
+                if (config.isLocked) {
+                    showLockedMessage(config.suspended || false);
+                    return;
                 }
-                logAction(`Zalogowano użytkownika: ${currentUser}`);
-                updateUIForRole();
-                renderCars();
-            } else {
-                handleFailedLogin(canonicalUser);
+
+                if (config.password === passVal) {
+                    currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
+                    localStorage.setItem('ecoCarUser', currentUser);
+                    localStorage.setItem('ecoCarReloadCount', '0');
+
+                    loginOverlay.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    loggedUserNameEl.textContent = currentUser;
+                    showToast(`Zalogowano jako ${currentUser}`, "success");
+
+                    loginPassInput.value = '';
+                    loginUserInput.value = '';
+                    lockedMsgEl.style.display = 'none';
+
+                    // Reset failed attempts in database
+                    await updateUserConfig(canonicalUser, { failedAttempts: 0 });
+
+                    if (currentUser === 'Tomek' || currentUser === 'Monia' || currentUser === 'Admin') {
+                        try {
+                            const settingKey = currentUser.toLowerCase() + '_login';
+                            await setDoc(doc(db, 'settings', settingKey), {
+                                lastLogin: new Date().toISOString()
+                            }, { merge: true });
+                        } catch (e) { console.error("Update login error", e); }
+                    }
+                    logAction(`Zalogowano użytkownika: ${currentUser}`);
+                    updateUIForRole();
+                    renderCars();
+                } else {
+                    const newFailed = (config.failedAttempts || 0) + 1;
+                    const isNowLocked = newFailed >= 3;
+                    
+                    await updateUserConfig(canonicalUser, {
+                        failedAttempts: newFailed,
+                        isLocked: isNowLocked
+                    });
+
+                    if (isNowLocked) {
+                        showLockedMessage(false);
+                        showToast("❌ Błędne hasło. Konto zostało zablokowane po 3 nieudanych próbach!", "error");
+                    } else {
+                        showToast(`Błędne hasło! Pozostało prób: ${3 - newFailed}`, "error");
+                    }
+                }
+            } catch (err) {
+                console.error("Login database error", err);
+                showToast("Błąd bazy danych podczas logowania", "error");
             }
         } else {
-            handleFailedLogin(canonicalUser);
+            showToast("Błędne hasło lub nieznany użytkownik!", "error");
         }
     };
 
@@ -266,25 +336,159 @@ function init() {
         }
     }
 
-    async function handleFailedLogin(username) {
-        let attempts = parseInt(localStorage.getItem('ecoCarFailedAttempts') || '0', 10);
-        attempts++;
-        localStorage.setItem('ecoCarFailedAttempts', attempts.toString());
-
-        if (attempts >= 3) {
-            try {
-                await setDoc(doc(db, 'settings', username + '_lock'), {
-                    locked: true,
-                    timestamp: new Date().toISOString()
-                });
-            } catch (e) { console.error("Lock error", e); }
-            showLockedMessage();
-            showToast("Konto zostało zablokowane!", "error");
-        } else {
-            showToast(`Błędne dane! Pozostało prób: ${3 - attempts}`, "error");
-        }
-    }
     updateUIForRole();
+
+    // Calendar Year Navigation
+    calendarPrevYearBtn.onclick = () => {
+        selectedYear--;
+        calendarCurrentYearEl.textContent = selectedYear;
+        renderCalendar();
+    };
+
+    calendarNextYearBtn.onclick = () => {
+        selectedYear++;
+        calendarCurrentYearEl.textContent = selectedYear;
+        renderCalendar();
+    };
+
+    // Calendar Add Form Mode Selection
+    tabAssignPanel.onclick = () => {
+        assignMode = 'panel';
+        tabAssignPanel.classList.add('active');
+        tabAssignManual.classList.remove('active');
+        groupAssignPanel.style.display = 'block';
+        groupAssignManual.style.display = 'none';
+    };
+
+    tabAssignManual.onclick = () => {
+        assignMode = 'manual';
+        tabAssignPanel.classList.remove('active');
+        tabAssignManual.classList.add('active');
+        groupAssignPanel.style.display = 'none';
+        groupAssignManual.style.display = 'block';
+    };
+
+    // Calendar Save Assignment
+    btnAddToTimeline.onclick = async () => {
+        if (!selectedDateStr) {
+            showToast("Wybierz najpierw dzień z kalendarza!", "error");
+            return;
+        }
+
+        let carId = "";
+        let customText = "";
+
+        if (assignMode === 'panel') {
+            carId = assignCarSelect.value;
+            if (!carId) {
+                showToast("Wybierz pojazd z bazy", "error");
+                return;
+            }
+        } else {
+            customText = assignCarManualInput.value.trim();
+            if (!customText) {
+                showToast("Wpisz model lub opis pojazdu", "error");
+                return;
+            }
+        }
+
+        const timeVal = assignCarTime.value || "";
+
+        const eventData = {
+            date: selectedDateStr,
+            carId: carId,
+            customText: customText,
+            time: timeVal,
+            addedBy: currentUser || "System",
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            await addDoc(collection(db, 'calendar_events'), eventData);
+            showToast("Dodano pojazd do planu dnia", "success");
+            logAction(`Dodano pojazd do kalendarza na dzień ${selectedDateStr}`);
+            
+            // Reset input form
+            assignCarSelect.value = "";
+            assignCarManualInput.value = "";
+            assignCarTime.value = "";
+        } catch (err) {
+            showToast("Błąd zapisu przypisania", "error");
+        }
+    };
+
+    // Admin toggles lock for Tomek
+    const tomekLockBtn = document.getElementById('btn-tomek-toggle-lock');
+    if (tomekLockBtn) {
+        tomekLockBtn.onclick = async () => {
+            const config = await getUserConfig('tomek');
+            const newLocked = !config.isLocked;
+            await updateUserConfig('tomek', {
+                isLocked: newLocked,
+                failedAttempts: newLocked ? 3 : 0
+            });
+            showToast(newLocked ? "Konto Tomasza zostało ZABLOKOWANE." : "Konto Tomasza zostało ODBLOKOWANE.", newLocked ? "error" : "success");
+            logAction(newLocked ? "Zablokowano konto Tomasza" : "Odblokowano konto Tomasza");
+            loadAdminData();
+        };
+    }
+
+    // Admin saves password for Tomek
+    const tomekSavePassBtn = document.getElementById('btn-tomek-save-password');
+    if (tomekSavePassBtn) {
+        tomekSavePassBtn.onclick = async () => {
+            const newPass = document.getElementById('tomek-password-input').value.trim();
+            if (!newPass) {
+                showToast("Hasło nie może być puste", "error");
+                return;
+            }
+            await updateUserConfig('tomek', { password: newPass });
+            showToast("Zmieniono hasło dla Tomasza.", "success");
+            logAction("Zmieniono hasło dla Tomasza");
+            loadAdminData();
+        };
+    }
+
+    // Admin toggles lock for Monia
+    const moniaLockBtn = document.getElementById('btn-monia-toggle-lock');
+    if (moniaLockBtn) {
+        moniaLockBtn.onclick = async () => {
+            const config = await getUserConfig('monia');
+            const newLocked = !config.isLocked;
+            await updateUserConfig('monia', {
+                isLocked: newLocked,
+                failedAttempts: newLocked ? 3 : 0
+            });
+            showToast(newLocked ? "Konto Moniki zostało ZABLOKOWANE." : "Konto Moniki zostało ODBLOKOWANE.", newLocked ? "error" : "success");
+            logAction(newLocked ? "Zablokowano konto Moniki" : "Odblokowano konto Moniki");
+            loadAdminData();
+        };
+    }
+
+    // Admin saves password for Monia
+    const moniaSavePassBtn = document.getElementById('btn-monia-save-password');
+    if (moniaSavePassBtn) {
+        moniaSavePassBtn.onclick = async () => {
+            const newPass = document.getElementById('monia-password-input').value.trim();
+            if (!newPass) {
+                showToast("Hasło nie może być puste", "error");
+                return;
+            }
+            await updateUserConfig('monia', { password: newPass });
+            showToast("Zmieniono hasło dla Moniki.", "success");
+            logAction("Zmieniono hasło dla Moniki");
+            loadAdminData();
+        };
+    }
+
+    // News logic
+    newsBtn.onclick = () => {
+        newsModal.classList.add('active');
+        fetchGitHubNews();
+    };
+    closeNewsModalBtn.onclick = () => {
+        newsModal.classList.remove('active');
+    };
 }
 
 async function logAction(actionText) {
@@ -342,10 +546,9 @@ async function loadAdminData() {
             }
         }
 
-        // Check lock status
-        const lockRef = doc(db, 'settings', userId + '_lock');
-        const lockSnap = await getDoc(lockRef);
-        const isLocked = lockSnap.exists() && lockSnap.data().locked;
+        // Check lock status from Firestore settings config
+        const config = await getUserConfig(userId);
+        const isLocked = config.isLocked;
         
         // Remove existing action buttons to prevent duplication
         const existingBtn = card.querySelector('.unlock-btn');
@@ -359,32 +562,20 @@ async function loadAdminData() {
         actionBtn.textContent = isLocked ? 'Odblokuj Konto' : 'Zawieś Konto';
         
         actionBtn.onclick = async () => {
-            if (isLocked) {
-                await setDoc(lockRef, { locked: false, suspended: false });
-                showToast(`Odblokowano użytkownika ${userId}`, "success");
-            } else {
-                const confirmed = await showConfirm(`Czy na pewno chcesz zawiesić konto użytkownika ${userId}?`, 'ZAWIEŚ', 'ANULUJ', true);
-                if (confirmed) {
-                    await setDoc(lockRef, { locked: true, suspended: true, timestamp: new Date().toISOString() });
-                    showToast(`Zawieszono użytkownika ${userId}`, "error");
-                }
-            }
+            const currentConf = await getUserConfig(userId);
+            const newLocked = !currentConf.isLocked;
+            await updateUserConfig(userId, {
+                isLocked: newLocked,
+                failedAttempts: newLocked ? 3 : 0
+            });
+            showToast(newLocked ? `Zawieszono/Zablokowano użytkownika ${userId}` : `Odblokowano użytkownika ${userId}`, newLocked ? "error" : "success");
+            logAction(newLocked ? `Zablokowano konto ${userId}` : `Odblokowano konto ${userId}`);
             loadAdminData();
         };
         card.querySelector('.user-info').appendChild(actionBtn);
 
         // Password Preview (Zaszyfrowany/Zamaskowany podgląd)
-        const validUsers = {
-            'admin': 'system02',
-            'tomek': 'tommar',
-            'monia': 'wanda',
-            'adam': '767211439',
-            'michal': '192837465',
-            'lukasz': '564738291',
-            'nastka': '908172635'
-        };
-        
-        const pass = validUsers[userId];
+        const pass = config.password;
         if (pass) {
             const existingPass = card.querySelector('.pass-preview');
             if (existingPass) existingPass.remove();
@@ -417,7 +608,37 @@ async function loadAdminData() {
         await updateStatusCard(userId, 'status-' + userId);
     }
 
-    // Load last 10 logs for everyone except Admin maybe? Or just keep current filter
+    // Load lock and password configuration for Tomek and Monia custom fields
+    const loadUserConfigToAdmin = async (userId) => {
+        const config = await getUserConfig(userId);
+        
+        const lockStatusEl = document.getElementById(`${userId}-lock-status`);
+        const failedAttemptsEl = document.getElementById(`${userId}-failed-attempts`);
+        const passwordInput = document.getElementById(`${userId}-password-input`);
+        const toggleLockBtn = document.getElementById(`btn-${userId}-toggle-lock`);
+
+        if (lockStatusEl) {
+            lockStatusEl.textContent = config.isLocked ? "TAK" : "NIE";
+            lockStatusEl.style.color = config.isLocked ? "#ef4444" : "#10b981";
+        }
+        if (failedAttemptsEl) {
+            failedAttemptsEl.textContent = `${config.failedAttempts || 0} / 3`;
+        }
+        if (passwordInput && document.activeElement !== passwordInput) {
+            passwordInput.value = config.password || '';
+        }
+        if (toggleLockBtn) {
+            toggleLockBtn.textContent = config.isLocked ? "ODBLOKUJ KONTO" : "ZABLOKUJ KONTO";
+            toggleLockBtn.style.background = config.isLocked ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
+            toggleLockBtn.style.borderColor = config.isLocked ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)";
+            toggleLockBtn.style.color = config.isLocked ? "#10b981" : "#ef4444";
+        }
+    };
+
+    await loadUserConfigToAdmin('tomek');
+    await loadUserConfigToAdmin('monia');
+
+    // Load last 10 logs for Tomek and Monia only
     const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
     const logsSnap = await getDocs(logsQ);
 
@@ -830,6 +1051,7 @@ window.onclick = (event) => {
     if (event.target === helpModal) helpModal.classList.remove('active');
     if (event.target === confirmModal) confirmModal.classList.remove('active');
     if (event.target === reportModal) reportModal.classList.remove('active');
+    if (event.target === newsModal) newsModal.classList.remove('active');
 };
 
 if (closeReportModalBtn) {
@@ -1120,5 +1342,223 @@ reportForm.addEventListener('submit', async (e) => {
 searchInput.addEventListener('input', (e) => {
     renderCars(e.target.value);
 });
+
+async function fetchGitHubNews() {
+    newsList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Ładowanie aktualności z repozytorium...</p>';
+
+    try {
+        const response = await fetch('https://api.github.com/repos/marciniak2112-lab/ecocar-app/commits?per_page=5');
+        if (!response.ok) throw new Error('Błąd pobierania danych z GitHub');
+
+        const commits = await response.json();
+
+        if (commits.length === 0) {
+            newsList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Brak ostatnich aktualizacji.</p>';
+            return;
+        }
+
+        newsList.innerHTML = commits.map(c => {
+            const date = new Date(c.commit.author.date).toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const message = c.commit.message.split('\n')[0];
+            const author = c.commit.author.name;
+            const avatar = c.author ? c.author.avatar_url : 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+
+            return `
+                <div class="news-item glass" style="margin-bottom: 10px; padding: 12px; display: flex; gap: 12px; align-items: flex-start;">
+                    <img src="${avatar}" alt="${author}" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-color);">
+                    <div class="news-content" style="flex: 1;">
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary-green); margin-bottom: 4px;">${author} <span style="font-weight: 400; color: var(--text-muted); font-size: 0.75rem;">• ${date}</span></div>
+                        <div style="font-size: 0.9rem; color: var(--text-main); line-height: 1.4;">${message}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('GitHub fetch error:', error);
+        newsList.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px;">Nie udało się pobrać aktualności. Spróbuj później.</p>`;
+    }
+}
+
+// Database-backed user config helpers
+async function getUserConfig(username) {
+    const docRef = doc(db, 'settings', username.toLowerCase() + '_config');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+        return snap.data();
+    } else {
+        const defaultPasswords = {
+            'admin': 'system02',
+            'tomek': 'tommar',
+            'monia': 'wanda'
+        };
+        const initialConfig = {
+            password: defaultPasswords[username.toLowerCase()] || 'eco123',
+            isLocked: false,
+            failedAttempts: 0
+        };
+        await setDoc(docRef, initialConfig);
+        return initialConfig;
+    }
+}
+
+async function updateUserConfig(username, updates) {
+    const docRef = doc(db, 'settings', username.toLowerCase() + '_config');
+    await updateDoc(docRef, updates);
+}
+
+// Calendar rendering helpers
+function renderCalendar() {
+    calendarMonthsRow.innerHTML = "";
+    
+    const plMonths = [
+        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", 
+        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+    ];
+
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDay = today.getDate();
+
+    for (let m = 0; m < 12; m++) {
+        const col = document.createElement('div');
+        col.className = 'month-column';
+        
+        const header = document.createElement('h4');
+        header.textContent = plMonths[m];
+        col.appendChild(header);
+
+        const daysList = document.createElement('div');
+        daysList.className = 'days-list';
+
+        const daysInMonth = new Date(selectedYear, m + 1, 0).getDate();
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${selectedYear}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            
+            const dayCell = document.createElement('div');
+            dayCell.className = 'day-cell';
+            dayCell.dataset.date = dateStr;
+            dayCell.innerHTML = `<span>${d}</span>`;
+
+            if (selectedYear === todayYear && m === todayMonth && d === todayDay) {
+                dayCell.classList.add('today-cell');
+            }
+
+            if (dateStr === selectedDateStr) {
+                dayCell.classList.add('selected-day');
+            }
+
+            const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
+            if (dayEvents.length > 0) {
+                const indicatorBox = document.createElement('div');
+                indicatorBox.className = 'day-indicator-box';
+                indicatorBox.innerHTML = `
+                    <span class="event-dot" style="${currentUser === 'Monia' ? 'background-color:#ec4899; box-shadow:0 0 8px #ec4899;' : ''}"></span>
+                    <span class="event-count-badge" style="${currentUser === 'Monia' ? 'background:rgba(236,72,153,0.2); color:#ec4899;' : ''}">${dayEvents.length}</span>
+                `;
+                dayCell.appendChild(indicatorBox);
+            }
+
+            dayCell.onclick = () => {
+                document.querySelectorAll('.day-cell.selected-day').forEach(el => el.classList.remove('selected-day'));
+                dayCell.classList.add('selected-day');
+                
+                selectedDateStr = dateStr;
+                openTimelineForDay(dateStr);
+            };
+
+            daysList.appendChild(dayCell);
+        }
+
+        col.appendChild(daysList);
+        calendarMonthsRow.appendChild(col);
+    }
+}
+
+function openTimelineForDay(dateStr) {
+    const d = new Date(dateStr);
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    const formattedDate = d.toLocaleDateString('pl-PL', options);
+    
+    selectedDayLabel.textContent = formattedDate;
+    timelineAddForm.style.display = 'block';
+
+    const activeCars = cars.filter(c => !c.archived);
+    assignCarSelect.innerHTML = '<option value="">Wybierz pojazd...</option>' + 
+        activeCars.map(c => `<option value="${c.id}">${c.brand} [${c.plateNum || 'brak tablic'}]</option>`).join('');
+
+    renderTimeline(dateStr);
+}
+
+function renderTimeline(dateStr) {
+    const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
+    
+    dayEvents.sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time) return -1;
+        if (b.time) return 1;
+        return new Date(a.timestamp) - new Date(b.timestamp);
+    });
+
+    if (dayEvents.length === 0) {
+        timelineEventsEl.innerHTML = '<p class="select-day-prompt">Brak zaplanowanych pojazdów na ten dzień. Dodaj auto poniżej!</p>';
+        return;
+    }
+
+    timelineEventsEl.innerHTML = dayEvents.map(ev => {
+        let label = "";
+        let typeBadge = "";
+        
+        if (ev.carId) {
+            const car = cars.find(c => c.id === ev.carId);
+            if (car) {
+                label = `${car.brand} 📌 <strong>${car.plateNum || 'brak tablic'}</strong> (Klient: ${car.ownerName || '---'})`;
+                typeBadge = "z panelu";
+            } else {
+                label = `Pojazd usunięty z bazy (ID: ${ev.carId})`;
+                typeBadge = "nieznany";
+            }
+        } else {
+            label = ev.customText || "";
+            typeBadge = "ręczny";
+        }
+
+        const timeDisplay = ev.time ? `<span class="timeline-time-badge" style="${currentUser === 'Monia' ? 'background:rgba(236,72,153,0.15); color:#ec4899;' : ''}">${ev.time}</span>` : `<span class="timeline-time-badge">--:--</span>`;
+
+        return `
+            <div class="timeline-item" style="${currentUser === 'Monia' ? 'border-left-color:#ec4899;' : ''}">
+                ${timeDisplay}
+                <div class="timeline-item-title">${label}</div>
+                <span class="timeline-item-type">${typeBadge}</span>
+                <button type="button" class="btn-icon btn-delete-event" data-id="${ev.id}" title="Usuń z osi czasu" style="padding: 4px 8px; color: #ef4444; border-color: rgba(239, 68, 68, 0.2); background: transparent;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    document.querySelectorAll('.btn-delete-event').forEach(btn => {
+        btn.onclick = async () => {
+            const evId = btn.dataset.id;
+            const confirmed = await showConfirm("Czy na pewno chcesz usunąć to auto z osi czasu?", "USUŃ", "ANULUJ", true);
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(db, 'calendar_events', evId));
+                    showToast("Usunięto przypisanie z kalendarza", "success");
+                    logAction(`Usunięto pojazd z kalendarza dla dnia ${dateStr}`);
+                } catch (e) {
+                    showToast("Błąd podczas usuwania", "error");
+                }
+            }
+        };
+    });
+}
 
 init();
