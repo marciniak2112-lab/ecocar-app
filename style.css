@@ -1692,6 +1692,7 @@ body.monia-mode .price-value {
     display: flex;
     flex-direction: column;
     min-height: 500px;
+    min-width: 0; /* Critical for horizontal scroll container inside grid */
 }
 
 .calendar-header-bar {
@@ -1718,23 +1719,41 @@ body.monia-mode .price-value {
 
 .months-scroll-container {
     overflow-x: auto;
-    padding-bottom: 10px;
+    padding-bottom: 15px;
     width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(255, 255, 255, 0.02);
+}
+
+.months-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.months-scroll-container::-webkit-scrollbar-thumb {
+    background-color: var(--primary-green);
+    border-radius: 10px;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.months-scroll-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
 }
 
 /* Horizontal Months Grid */
 .months-row {
     display: flex;
-    gap: 1rem;
+    gap: 1.2rem;
 }
 
 .month-column {
-    min-width: 165px;
-    flex: 1 0 calc(100% / 12 - 1rem);
+    width: 280px;
+    min-width: 280px;
+    flex: 0 0 280px; /* Fixed premium width so months scroll horizontally rather than squashing */
     background: rgba(255, 255, 255, 0.01);
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    padding: 10px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1743,7 +1762,7 @@ body.monia-mode .price-value {
 .month-column h4 {
     text-align: center;
     color: var(--primary-green);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 700;
     margin-bottom: 5px;
     text-transform: uppercase;
@@ -1758,7 +1777,16 @@ body.monia-mode .price-value {
     gap: 6px;
     max-height: 420px;
     overflow-y: auto;
-    padding-right: 2px;
+    padding-right: 4px;
+}
+
+.days-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.days-list::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
 }
 
 /* Day Cell Styles */

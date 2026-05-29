@@ -97,6 +97,7 @@ const calendarCurrentYearEl = document.getElementById('calendar-current-year');
 const calendarPrevYearBtn = document.getElementById('calendar-prev-year');
 const calendarNextYearBtn = document.getElementById('calendar-next-year');
 const selectedDayLabel = document.getElementById('selected-day-label');
+const timelinePanel = document.getElementById('timeline-panel');
 const timelineEventsEl = document.getElementById('timeline-events');
 const timelineAddForm = document.getElementById('timeline-add-form');
 const tabAssignPanel = document.getElementById('tab-assign-panel');
