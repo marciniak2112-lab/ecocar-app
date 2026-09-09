@@ -1399,7 +1399,7 @@ async function loadAdminData() {
         };
         card.querySelector('.user-info').appendChild(actionBtn);
 
-        const pass = await getUserPassword(userId);
+        const pass = (await getUserPassword(userId)) || DEFAULT_PASSWORDS[userId.toLowerCase()] || '123456789';
         if (pass) {
             const existingPass = card.querySelector('.pass-preview');
             if (existingPass) existingPass.remove();
