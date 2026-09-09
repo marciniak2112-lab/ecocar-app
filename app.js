@@ -48,6 +48,45 @@ let selectedCalDate = null;
 let customTodos = [];
 let deferredPrompt = null;
 
+// Default user passwords fallback
+const DEFAULT_PASSWORDS = {
+    'admin': 'system02',
+    'tomek': 'tommar',
+    'monia': 'wanda',
+    'adam': '767211439',
+    'michal': '192837465',
+    'lukasz': '564738291',
+    'nastka': '908172635'
+};
+
+// Helper: Get Password from Firestore settings collection or fallback
+async function getUserPassword(username) {
+    const canonical = username.toLowerCase();
+    try {
+        const passDoc = await getDoc(doc(db, 'settings', canonical + '_pass'));
+        if (passDoc.exists() && passDoc.data().password) {
+            return passDoc.data().password;
+        }
+    } catch (e) { console.error("Get pass error", e); }
+    return DEFAULT_PASSWORDS[canonical] || null;
+}
+
+// Helper: Change Password in Firestore settings collection
+async function changeUserPassword(username, newPassword) {
+    const canonical = username.toLowerCase();
+    try {
+        await setDoc(doc(db, 'settings', canonical + '_pass'), {
+            password: newPassword,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser || 'Admin'
+        });
+        return true;
+    } catch (e) {
+        console.error("Change pass error", e);
+        return false;
+    }
+}
+
 // Helper: Check if user is Owner (Właściciel)
 function isOwner(user = currentUser) {
     if (!user) return false;
@@ -319,8 +358,10 @@ function setupLogin() {
             'nastka': '908172635'
         };
 
-        if (validUsers[canonicalUser]) {
-            if (validUsers[canonicalUser] === passVal) {
+        const expectedPass = await getUserPassword(canonicalUser);
+
+        if (expectedPass !== null) {
+            if (expectedPass === passVal) {
                 localStorage.removeItem('ecoCarFailedAttempts');
                 currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
                 if (canonicalUser === 'michal') currentUser = 'Michał';
@@ -1306,17 +1347,7 @@ async function loadAdminData() {
         };
         card.querySelector('.user-info').appendChild(actionBtn);
 
-        const validUsers = {
-            'admin': 'system02',
-            'tomek': 'tommar',
-            'monia': 'wanda',
-            'adam': '767211439',
-            'michal': '192837465',
-            'lukasz': '564738291',
-            'nastka': '908172635'
-        };
-
-        const pass = validUsers[userId];
+        const pass = await getUserPassword(userId);
         if (pass) {
             const existingPass = card.querySelector('.pass-preview');
             if (existingPass) existingPass.remove();
@@ -1325,19 +1356,45 @@ async function loadAdminData() {
             passContainer.className = 'pass-preview';
             passContainer.style.fontSize = '0.75rem';
             passContainer.style.marginTop = '10px';
-            passContainer.style.padding = '4px 8px';
+            passContainer.style.padding = '8px';
             passContainer.style.background = 'rgba(255,255,255,0.05)';
-            passContainer.style.borderRadius = '6px';
+            passContainer.style.borderRadius = '8px';
             passContainer.style.color = 'var(--text-muted)';
+            passContainer.style.display = 'flex';
+            passContainer.style.flexDirection = 'column';
+            passContainer.style.gap = '6px';
 
             const maskedPass = '●'.repeat(pass.length);
-            passContainer.innerHTML = `🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span> <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-left:5px;">POKAŻ</button>`;
+            passContainer.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span></span>
+                    <div>
+                        <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-right:4px;">POKAŻ</button>
+                        <button class="btn-edit-pass" style="background:rgba(16,185,129,0.15); border:1px solid var(--primary-green); color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; padding:2px 6px; border-radius:4px;">✏️ ZMIEŃ</button>
+                    </div>
+                </div>
+            `;
 
             passContainer.querySelector('.btn-show-pass').onclick = (e) => {
                 const valEl = passContainer.querySelector('.pass-val');
                 const isMasked = valEl.textContent.includes('●');
                 valEl.textContent = isMasked ? valEl.dataset.real : '●'.repeat(pass.length);
                 e.target.textContent = isMasked ? 'UKRYJ' : 'POKAŻ';
+            };
+
+            passContainer.querySelector('.btn-edit-pass').onclick = async () => {
+                const newPass = prompt(`Wpisz nowe hasło dla użytkownika ${userId}:`, pass);
+                if (newPass !== null && newPass.trim() !== '') {
+                    const cleanPass = newPass.trim();
+                    const success = await changeUserPassword(userId, cleanPass);
+                    if (success) {
+                        showToast(`Pomyślnie zmieniono hasło dla ${userId}!`, "success");
+                        logAction(`Admin zmienił hasło dla użytkownika ${userId}`);
+                        loadAdminData();
+                    } else {
+                        showToast("Błąd zmiany hasła", "error");
+                    }
+                }
             };
 
             card.querySelector('.user-info').appendChild(passContainer);
