@@ -43,46 +43,72 @@
     </div>
 
     <div id="app" style="display: none;">
-        <header>
-            <div class="logo">
-                <span class="eco">Eco</span><span class="car">Car</span><span class="pro">Pro</span>
-            </div>
-            <div class="header-nav">
-                <div class="view-tabs">
-                    <button id="view-active" class="tab-btn active">🏎️ Aktywne</button>
-                    <button id="view-calendar" class="tab-btn">📅 Kalendarz</button>
-                    <button id="view-archive" class="tab-btn">📦 Archiwum</button>
-                    <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
+        <header class="main-header glass">
+            <!-- Row 1: Brand Logo & Utility Actions -->
+            <div class="header-top-row">
+                <div class="logo">
+                    <span class="eco">Eco</span><span class="car">Car</span><span class="pro">Pro</span>
+                </div>
+                <div class="header-utility-actions">
+                    <button id="notif-btn" class="btn-secondary notif-bell-btn" title="Powiadomienia dla Właścicieli" style="display:none; position:relative;">
+                        🔔 <span id="notif-badge" class="notif-badge" style="display:none;">0</span>
+                    </button>
+                    <button id="pwa-install-btn" class="btn-secondary pwa-btn" title="Pobierz Aplikację na Telefon">
+                        📲 Pobierz Apkę
+                    </button>
+                    <button id="theme-toggle" class="btn-secondary" title="Przełącz motyw">
+                        <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" style="display:none;">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg id="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                    <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </button>
+                    <div class="user-pill glass">
+                        <span id="logged-user-name">Gość</span>
+                        <button id="logout-btn" class="btn-icon" title="Wyloguj">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="header-actions">
-                <button id="notif-btn" class="btn-secondary notif-bell-btn" title="Powiadomienia dla Właścicieli" style="display:none; position:relative;">
-                    🔔 <span id="notif-badge" class="notif-badge" style="display:none;">0</span>
-                </button>
-                <button id="pwa-install-btn" class="btn-secondary" title="Pobierz Aplikację na Telefon">
-                    📲 Pobierz Apkę
-                </button>
-                <button id="theme-toggle" class="btn-secondary" title="Przełącz motyw">
-                    <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round" style="display:none;">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg id="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
-                <button id="add-car-btn" class="btn-primary">
+
+            <!-- Row 2: View Navigation Tabs & Primary Action -->
+            <div class="header-bottom-row">
+                <div class="view-tabs-container">
+                    <div class="view-tabs">
+                        <button id="view-active" class="tab-btn active">🏎️ Aktywne</button>
+                        <button id="view-calendar" class="tab-btn">📅 Kalendarz</button>
+                        <button id="view-archive" class="tab-btn">📦 Archiwum</button>
+                        <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
+                    </div>
+                </div>
+                <button id="add-car-btn" class="btn-primary main-add-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -90,25 +116,6 @@
                     </svg>
                     Dodaj Auto
                 </button>
-                <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </button>
-                <div class="user-pill glass">
-                    <span id="logged-user-name">Gość</span>
-                    <button id="logout-btn" class="btn-icon" title="Wyloguj">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                    </button>
-                </div>
             </div>
         </header>
 
