@@ -718,10 +718,12 @@ function renderCalendar() {
         let badgesHtml = '';
         dayCars.slice(0, 3).forEach(car => {
             const isArrival = car.arrivalDate === dateStr;
-            const badgeClass = isArrival ? 'arrival' : 'pickup';
-            const prefix = isArrival ? '🟢' : '🔑';
+            const isOgledziny = car.visitType === 'ogledziny';
+            const badgeClass = isOgledziny ? 'ogledziny' : (isArrival ? 'usluga' : 'pickup');
+            const prefix = isOgledziny ? '🔍' : (isArrival ? '🛠️' : '🔑');
+            const typeLabel = isOgledziny ? 'Oględziny' : 'Usługa';
             const pinnedClass = car.pinnedOnMain ? 'pinned' : '';
-            badgesHtml += `<span class="cal-car-badge ${badgeClass} ${pinnedClass}">${prefix} ${car.brand}</span>`;
+            badgesHtml += `<span class="cal-car-badge ${badgeClass} ${pinnedClass}">${prefix} ${typeLabel}: ${car.brand}</span>`;
         });
 
         if (dayCars.length > 3) {
@@ -756,6 +758,11 @@ function openCalendarDayModal(dateStr, dayCars) {
             <div class="cal-day-car-item">
                 <div>
                     <strong>${car.brand}</strong> ${car.plateNum ? `(${car.plateNum})` : ''}
+                    <div style="font-size:0.75rem; margin-top:3px;">
+                        <span style="font-weight:700; color:${car.visitType === 'ogledziny' ? '#f59e0b' : 'var(--primary-green)'};">
+                            ${car.visitType === 'ogledziny' ? '🔍 TYLKO OGLĘDZINY / WYCENA' : '🛠️ PEŁNA USŁUGA'}
+                        </span>
+                    </div>
                     <div style="font-size:0.75rem; color:var(--text-muted);">
                         Właściciel: ${car.ownerName || '---'} | Status: ${car.status || 'przyjedzie'}
                     </div>
@@ -1160,6 +1167,8 @@ addCarBtn.addEventListener('click', () => {
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
     document.getElementById('car-id').value = '';
+    document.getElementById('car-service-name').value = '';
+    document.getElementById('car-visit-type').value = 'usluga';
     document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
     document.getElementById('car-priority').checked = false;
     customTodos = [];
@@ -1228,9 +1237,17 @@ carForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const id = document.getElementById('car-id').value;
+    const serviceName = document.getElementById('car-service-name').value.trim();
+    const visitType = document.getElementById('car-visit-type').value || 'usluga';
+
     const todoCheckboxes = document.querySelectorAll('input[name="todo"]:checked');
     const checkedTodos = Array.from(todoCheckboxes).map(cb => ({ text: cb.value, done: false }));
     
+    // Merge custom service name if entered
+    if (serviceName) {
+        checkedTodos.unshift({ text: "Usługa: " + serviceName, done: false, isPrimaryService: true });
+    }
+
     // Merge predefined checked todos and custom added todos
     const combinedTodos = [...checkedTodos, ...customTodos];
 
@@ -1244,6 +1261,8 @@ carForm.addEventListener('submit', async (e) => {
         worker: document.getElementById('car-worker').value,
         arrivalDate: document.getElementById('car-arrival-date').value,
         pickupDate: document.getElementById('car-pickup-date').value,
+        serviceName: serviceName,
+        visitType: visitType,
         todoTasks: combinedTodos,
         todo: combinedTodos.map(t => t.text),
         priority: document.getElementById('car-priority').checked,
@@ -1264,7 +1283,8 @@ carForm.addEventListener('submit', async (e) => {
             logAction(`Dodano nowe auto: ${carData.brand}`);
 
             // Send notification record for Owners
-            const notifMsg = `🏎️ ${currentUser || 'Pracownik'} dodał nowe auto: ${carData.brand}${carData.plateNum ? ' (' + carData.plateNum + ')' : ''}`;
+            const typeLabel = visitType === 'ogledziny' ? 'na oględziny' : 'na usługę';
+            const notifMsg = `🏎️ ${currentUser || 'Pracownik'} dodał nowe auto ${typeLabel}: ${carData.brand}${carData.plateNum ? ' (' + carData.plateNum + ')' : ''}`;
             try {
                 await addDoc(notificationsCol, {
                     text: notifMsg,
@@ -1319,6 +1339,8 @@ function editCar(id) {
         document.getElementById('car-worker').value = car.worker || '';
         document.getElementById('car-arrival-date').value = car.arrivalDate || '';
         document.getElementById('car-pickup-date').value = car.pickupDate || '';
+        document.getElementById('car-service-name').value = car.serviceName || '';
+        document.getElementById('car-visit-type').value = car.visitType || 'usluga';
         document.getElementById('car-priority').checked = car.priority || false;
 
         // Reset and set checkboxes

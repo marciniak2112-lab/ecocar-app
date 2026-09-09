@@ -1628,6 +1628,18 @@ body.monia-mode .price-value {
     border: 1px solid rgba(0, 212, 255, 0.4);
 }
 
+.cal-car-badge.ogledziny {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.cal-car-badge.usluga {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
 .cal-car-badge.pinned {
     border-left: 3px solid #ffc107;
 }
