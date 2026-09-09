@@ -448,6 +448,40 @@ async function logAction(actionText) {
     } catch (e) { console.error("Log error", e); }
 }
 
+function requestPushNotificationPermission() {
+    if (isOwner(currentUser) && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                showToast("Włączono powiadomienia systemowe na telefonie!", "success");
+            }
+        });
+    }
+}
+
+function sendSystemPushNotification(title, body) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        try {
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification(title, {
+                        body: body,
+                        icon: 'icon-192.png',
+                        badge: 'icon-192.png',
+                        vibrate: [200, 100, 200],
+                        tag: 'ecocarpro-notif-' + Date.now()
+                    });
+                });
+            } else {
+                new Notification(title, {
+                    body: body,
+                    icon: 'icon-192.png'
+                });
+            }
+        } catch (e) { console.error("System push error", e); }
+    }
+}
+
 function updateUIForRole() {
     const role = (currentUser || '').toLowerCase();
     const owner = isOwner(currentUser);
@@ -468,6 +502,7 @@ function updateUIForRole() {
     if (owner) {
         notifBtn.style.display = 'flex';
         mobNavNotif.style.display = 'flex';
+        requestPushNotificationPermission();
     } else {
         notifBtn.style.display = 'none';
         mobNavNotif.style.display = 'none';
@@ -1224,9 +1259,26 @@ carForm.addEventListener('submit', async (e) => {
             showToast("Zaktualizowano dane auta", "success");
             logAction(`Edytowano auto: ${carData.brand}`);
         } else {
-            await addDoc(carsCol, carData);
+            const newCarRef = await addDoc(carsCol, carData);
             showToast("Dodano nowe auto", "success");
             logAction(`Dodano nowe auto: ${carData.brand}`);
+
+            // Send notification record for Owners
+            const notifMsg = `🏎️ ${currentUser || 'Pracownik'} dodał nowe auto: ${carData.brand}${carData.plateNum ? ' (' + carData.plateNum + ')' : ''}`;
+            try {
+                await addDoc(notificationsCol, {
+                    text: notifMsg,
+                    carId: newCarRef.id,
+                    carBrand: carData.brand,
+                    worker: currentUser || 'Pracownik',
+                    type: 'car_added',
+                    timestamp: new Date().toISOString(),
+                    read: false
+                });
+            } catch (e) { console.error("Car add notif error", e); }
+
+            // Trigger system push notification for Owners
+            sendSystemPushNotification("🏎️ Nowe Auto w Systemie EcoCarPro", notifMsg);
         }
         carModal.classList.remove('active');
     } catch (error) {
@@ -1366,11 +1418,12 @@ async function loadAdminData() {
 
             const maskedPass = '●'.repeat(pass.length);
             passContainer.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
                     <span>🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span></span>
-                    <div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
                         <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-right:4px;">POKAŻ</button>
                         <button class="btn-edit-pass" style="background:rgba(16,185,129,0.15); border:1px solid var(--primary-green); color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; padding:2px 6px; border-radius:4px;">✏️ ZMIEŃ</button>
+                        <button class="btn-gen-pass" style="background:rgba(59,130,246,0.15); border:1px solid #3b82f6; color:#3b82f6; cursor:pointer; font-size:0.7rem; font-weight:bold; padding:2px 6px; border-radius:4px;">🎲 WYGENERUJ LOSOWE</button>
                     </div>
                 </div>
             `;
@@ -1388,12 +1441,24 @@ async function loadAdminData() {
                     const cleanPass = newPass.trim();
                     const success = await changeUserPassword(userId, cleanPass);
                     if (success) {
-                        showToast(`Pomyślnie zmieniono hasło dla ${userId}!`, "success");
+                        showToast(`Pomyślnie zmieniono i zapisano hasło dla ${userId}!`, "success");
                         logAction(`Admin zmienił hasło dla użytkownika ${userId}`);
                         loadAdminData();
                     } else {
                         showToast("Błąd zmiany hasła", "error");
                     }
+                }
+            };
+
+            passContainer.querySelector('.btn-gen-pass').onclick = async () => {
+                const randomPass = Math.floor(100000000 + Math.random() * 900000000).toString();
+                const success = await changeUserPassword(userId, randomPass);
+                if (success) {
+                    showToast(`Wygenerowano i zapisano nowe hasło dla ${userId}: ${randomPass}`, "success");
+                    logAction(`Admin wygenerował nowe losowe hasło dla ${userId}`);
+                    loadAdminData();
+                } else {
+                    showToast("Błąd generowania hasła", "error");
                 }
             };
 
