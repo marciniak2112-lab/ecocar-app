@@ -3,10 +3,17 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EcoCarPro | Zarządzanie Samochodami</title>
     <meta name="description"
         content="EcoCarPro - Profesjonalny system zarządzania flotą i serwisem samochodowym. Monitoruj ceny, właścicieli i historię napraw w eleganckim wydaniu.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EcoCarPro">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -42,13 +49,19 @@
             </div>
             <div class="header-nav">
                 <div class="view-tabs">
-                    <button id="view-active" class="tab-btn active">Aktywne</button>
-                    <button id="view-archive" class="tab-btn">Archiwum</button>
-                    <button id="view-calendar" class="tab-btn">Kalendarz</button>
-                    <button id="view-admin" class="tab-btn">Panel Admin</button>
+                    <button id="view-active" class="tab-btn active">🏎️ Aktywne</button>
+                    <button id="view-calendar" class="tab-btn">📅 Kalendarz</button>
+                    <button id="view-archive" class="tab-btn">📦 Archiwum</button>
+                    <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
                 </div>
             </div>
             <div class="header-actions">
+                <button id="notif-btn" class="btn-secondary notif-bell-btn" title="Powiadomienia dla Właścicieli" style="display:none; position:relative;">
+                    🔔 <span id="notif-badge" class="notif-badge" style="display:none;">0</span>
+                </button>
+                <button id="pwa-install-btn" class="btn-secondary" title="Pobierz Aplikację na Telefon">
+                    📲 Pobierz Apkę
+                </button>
                 <button id="theme-toggle" class="btn-secondary" title="Przełącz motyw">
                     <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -77,7 +90,6 @@
                     </svg>
                     Dodaj Auto
                 </button>
-
                 <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,7 +97,6 @@
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
-                    Pomoc
                 </button>
                 <div class="user-pill glass">
                     <span id="logged-user-name">Gość</span>
@@ -129,122 +140,62 @@
                 </div>
             </div>
 
+            <!-- Cars Grid View -->
             <div id="cars-grid" class="cars-grid">
-                <!-- Car cards will be injected here -->
                 <div class="empty-state">
                     <p>Brak samochodów w systemie. Kliknij "Dodaj Auto", aby zacząć.</p>
                 </div>
             </div>
 
-            <div id="calendar-section" class="calendar-section" style="display: none;">
-                <div class="calendar-layout-container">
-                    <div class="calendar-grid-card glass">
-                        <div class="calendar-header-bar">
-                            <h3>📅 Kalendarz Pracy</h3>
-                            <div class="year-selector">
-                                <button type="button" id="calendar-prev-year" class="btn-icon">◀</button>
-                                <span id="calendar-current-year">2026</span>
-                                <button type="button" id="calendar-next-year" class="btn-icon">▶</button>
-                            </div>
-                        </div>
-                        <div class="months-scroll-container">
-                            <div class="months-row" id="calendar-months-row">
-                                <!-- 12 Month columns will be dynamically injected here -->
-                            </div>
-                        </div>
+            <!-- Calendar Section -->
+            <div id="calendar-section" class="calendar-section glass" style="display: none;">
+                <div class="calendar-header">
+                    <div class="cal-nav">
+                        <button id="cal-prev-month" class="btn-secondary">&lt;</button>
+                        <h2 id="cal-month-year">Miesiąc Rok</h2>
+                        <button id="cal-next-month" class="btn-secondary">&gt;</button>
                     </div>
-                    <div class="timeline-panel-card glass" id="timeline-panel">
-                        <div class="timeline-header">
-                            <h3>⏱️ Oś czasu: <span id="selected-day-label">Wybierz dzień</span></h3>
-                        </div>
-                        <div class="timeline-events-container" id="timeline-events">
-                            <p class="select-day-prompt">Kliknij dowolny dzień w kalendarzu, aby wyświetlić i zaplanować pojazdy.</p>
-                        </div>
-                        <div class="timeline-add-form" id="timeline-add-form" style="display: none;">
-                            <hr style="border-color: var(--border-color); margin: 15px 0;">
-                            <h4>➕ Zaplanuj Pojazd</h4>
-                            <div class="tab-selector" style="display: flex; gap: 8px; margin: 10px 0;">
-                                <button type="button" id="tab-assign-panel" class="btn-status active" style="flex: 1; padding: 6px;">Z panelu</button>
-                                <button type="button" id="tab-assign-manual" class="btn-status" style="flex: 1; padding: 6px;">Wpisz ręcznie</button>
-                            </div>
-                            <div class="form-group" id="group-assign-panel">
-                                <label>Pojazd z bazy</label>
-                                <select id="assign-car-select" class="form-select">
-                                    <option value="">Wybierz pojazd...</option>
-                                    <!-- Options will be injected -->
-                                </select>
-                            </div>
-                            <div class="form-group" id="group-assign-manual" style="display: none;">
-                                <label>Model / Wpis (np. Audi A4 - Klient X)</label>
-                                <input type="text" id="assign-car-manual-input" placeholder="Wpisz nazwę pojazdu lub klienta">
-                            </div>
-                            <div class="form-grid" style="margin-bottom: 12px;">
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label>Godzina (opcjonalnie)</label>
-                                    <input type="time" id="assign-car-time">
-                                </div>
-                            </div>
-                            <button type="button" id="btn-add-to-timeline" class="btn-submit" style="width: 100%;">Dodaj do Osi Czasu</button>
-                        </div>
-                    </div>
+                    <button id="cal-today-btn" class="btn-primary">Dzisiaj</button>
+                </div>
+                <div class="calendar-days-header">
+                    <span>Pn</span>
+                    <span>Wt</span>
+                    <span>Śr</span>
+                    <span>Cz</span>
+                    <span>Pt</span>
+                    <span>Sob</span>
+                    <span>Niedz</span>
+                </div>
+                <div id="calendar-grid" class="calendar-grid">
+                    <!-- Calendar days (square tiles) injected dynamically -->
                 </div>
             </div>
 
+            <!-- Admin Section -->
             <div id="admin-section" class="admin-section" style="display: none;">
                 <div class="users-status-grid">
-                    <div id="status-tomek" class="user-status-card glass flex-column" style="display: flex; flex-direction: column; align-items: stretch; gap: 15px; padding: 1.5rem;">
-                        <div style="display: flex; align-items: center; gap: 1.5rem;">
-                            <div class="user-avatar">T</div>
-                            <div class="user-info">
-                                <h3>Tomasz</h3>
-                                <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                                <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                            </div>
-                        </div>
-                        <div class="account-mgmt-box" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                                <span class="label" style="color: var(--text-muted);">Konto zablokowane:</span>
-                                <span class="lock-status" id="tomek-lock-status" style="font-weight: 700; color: #10b981;">NIE</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                                <span class="label" style="color: var(--text-muted);">Próby logowania:</span>
-                                <span class="failed-attempts" id="tomek-failed-attempts" style="font-weight: 700;">0 / 3</span>
-                            </div>
-                            <div style="display: flex; gap: 8px; margin: 5px 0;">
-                                <button type="button" id="btn-tomek-toggle-lock" class="btn-status" style="width: 100%; font-size: 0.75rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;">ZABLOKUJ KONTO</button>
-                            </div>
-                            <div class="form-group" style="margin: 0; display: flex; gap: 8px; align-items: center;">
-                                <input type="text" id="tomek-password-input" placeholder="Hasło" style="flex: 1; padding: 6px 10px; font-size: 0.85rem; height: 32px; border-radius: 6px;">
-                                <button type="button" id="btn-tomek-save-password" class="btn-primary" style="height: 32px; padding: 0 12px; font-size: 0.8rem; border-radius: 6px; box-shadow: none;">Zapisz</button>
-                            </div>
+                    <div id="status-admin" class="user-status-card glass">
+                        <div class="user-avatar" style="background: #ef4444;">A</div>
+                        <div class="user-info">
+                            <h3>Administrator</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
                         </div>
                     </div>
-                    
-                    <div id="status-monia" class="user-status-card glass flex-column" style="display: flex; flex-direction: column; align-items: stretch; gap: 15px; padding: 1.5rem;">
-                        <div style="display: flex; align-items: center; gap: 1.5rem;">
-                            <div class="user-avatar" style="background: #ec4899; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);">M</div>
-                            <div class="user-info">
-                                <h3>Monika</h3>
-                                <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                                <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                            </div>
+                    <div id="status-tomek" class="user-status-card glass">
+                        <div class="user-avatar">T</div>
+                        <div class="user-info">
+                            <h3>Tomasz</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
                         </div>
-                        <div class="account-mgmt-box" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                                <span class="label" style="color: var(--text-muted);">Konto zablokowane:</span>
-                                <span class="lock-status" id="monia-lock-status" style="font-weight: 700; color: #10b981;">NIE</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                                <span class="label" style="color: var(--text-muted);">Próby logowania:</span>
-                                <span class="failed-attempts" id="monia-failed-attempts" style="font-weight: 700;">0 / 3</span>
-                            </div>
-                            <div style="display: flex; gap: 8px; margin: 5px 0;">
-                                <button type="button" id="btn-monia-toggle-lock" class="btn-status" style="width: 100%; font-size: 0.75rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;">ZABLOKUJ KONTO</button>
-                            </div>
-                            <div class="form-group" style="margin: 0; display: flex; gap: 8px; align-items: center;">
-                                <input type="text" id="monia-password-input" placeholder="Hasło" style="flex: 1; padding: 6px 10px; font-size: 0.85rem; height: 32px; border-radius: 6px;">
-                                <button type="button" id="btn-monia-save-password" class="btn-primary" style="height: 32px; padding: 0 12px; font-size: 0.8rem; border-radius: 6px; box-shadow: none;">Zapisz</button>
-                            </div>
+                    </div>
+                    <div id="status-monia" class="user-status-card glass">
+                        <div class="user-avatar">M</div>
+                        <div class="user-info">
+                            <h3>Monika</h3>
+                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
+                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
                         </div>
                     </div>
                     <div id="status-adam" class="user-status-card glass">
@@ -283,8 +234,8 @@
 
                 <div class="logs-container glass">
                     <div class="logs-header">
-                        <h3>📋 Ostatnie działania (Tomek & Monia)</h3>
-                        <span class="info-tag">10 ostatnich zmian</span>
+                        <h3>📋 Ostatnie działania (Wszyscy Użytkownicy)</h3>
+                        <span class="info-tag">Logi systemowe</span>
                     </div>
                     <div id="logs-list" class="logs-list">
                         <!-- Logs will be injected here -->
@@ -292,6 +243,31 @@
                 </div>
             </div>
         </main>
+
+        <!-- Mobile Bottom Navigation -->
+        <nav class="mobile-bottom-nav">
+            <button id="mob-nav-active" class="mob-nav-item active">
+                <span class="mob-icon">🏎️</span>
+                <span class="mob-label">Aktywne</span>
+            </button>
+            <button id="mob-nav-calendar" class="mob-nav-item">
+                <span class="mob-icon">📅</span>
+                <span class="mob-label">Kalendarz</span>
+            </button>
+            <button id="mob-nav-archive" class="mob-nav-item">
+                <span class="mob-icon">📦</span>
+                <span class="mob-label">Archiwum</span>
+            </button>
+            <button id="mob-nav-admin" class="mob-nav-item" style="display:none;">
+                <span class="mob-icon">👑</span>
+                <span class="mob-label">Admin</span>
+            </button>
+            <button id="mob-nav-notif" class="mob-nav-item" style="display:none;">
+                <span class="mob-icon">🔔</span>
+                <span class="mob-label">Powiadomienia</span>
+                <span id="mob-notif-badge" class="mob-notif-badge" style="display:none;">0</span>
+            </button>
+        </nav>
 
         <!-- Modal for Adding/Editing Car -->
         <div id="car-modal" class="modal">
@@ -318,11 +294,11 @@
                             <input type="number" id="car-price" placeholder="0.00" required>
                         </div>
                         <div class="form-group">
-                            <label for="car-owner-name">Imię Właściciela</label>
+                            <label for="car-owner-name">Imię Właściciela Auta</label>
                             <input type="text" id="car-owner-name" placeholder="np. Jan Kowalski" required>
                         </div>
                         <div class="form-group">
-                            <label for="car-owner-phone">Telefon Właściciela</label>
+                            <label for="car-owner-phone">Telefon Właściciela Auta</label>
                             <input type="tel" id="car-owner-phone" placeholder="123 456 789" required>
                         </div>
                     </div>
@@ -337,8 +313,8 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="car-history">Uwagi</label>
-                        <textarea id="car-history" placeholder="Dodatkowe uwagi, uwagi klienta..." rows="4"></textarea>
+                        <label for="car-history">Uwagi i Opis Zlecenia</label>
+                        <textarea id="car-history" placeholder="Dodatkowe uwagi, życzenia klienta..." rows="3"></textarea>
                     </div>
                     <div class="form-grid">
                         <div class="form-group">
@@ -347,12 +323,15 @@
                                 <option value="">Wybierz pracownika...</option>
                                 <option value="Adam">Adam</option>
                                 <option value="Łukasz">Łukasz</option>
+                                <option value="Michał">Michał</option>
                                 <option value="Nastka">Nastka</option>
+                                <option value="Tomasz">Tomasz</option>
+                                <option value="Monika">Monika</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Do zrobienia:</label>
+                        <label>Zadania Do Zrobienia:</label>
                         <div class="checkbox-group">
                             <label class="checkbox-container">
                                 <input type="checkbox" name="todo" value="Konserwacja podwozia">
@@ -369,13 +348,28 @@
                                 <span class="checkmark"></span>
                                 Czyszczenie środka
                             </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Korekta lakieru">
+                                <span class="checkmark"></span>
+                                Korekta lakieru
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Pranie tapicerki">
+                                <span class="checkmark"></span>
+                                Pranie tapicerki
+                            </label>
                         </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <input type="text" id="custom-todo-input" placeholder="+ Dodaj własne zadanie..." style="flex:1; font-size:0.85rem;">
+                            <button type="button" id="add-custom-todo-btn" class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;">Dodaj</button>
+                        </div>
+                        <div id="custom-todos-list" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
                     </div>
                     <div class="form-group">
                         <label class="checkbox-container priority-toggle">
                             <input type="checkbox" id="car-priority">
                             <span class="checkmark priority-checkmark"></span>
-                            Priorytet
+                            ⚡ Wysoki Priorytet
                         </label>
                     </div>
                     <div class="form-actions">
@@ -384,90 +378,175 @@
                 </form>
             </div>
         </div>
-    </div>
 
-    <!-- Custom Confirmation Modal -->
-    <div id="confirm-modal" class="modal">
-        <div class="modal-content glass confirm-content">
-            <h3>Potwierdzenie</h3>
-            <p id="confirm-message">Czy na pewno chcesz wykonać tę operację?</p>
-            <div class="confirm-actions">
-                <button id="confirm-cancel" class="btn-secondary">Anuluj</button>
-                <button id="confirm-ok" class="btn-primary danger">Usuń</button>
+        <!-- Calendar Day Action Modal -->
+        <div id="calendar-day-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2 id="cal-day-modal-title">Zarządzanie dla dnia</h2>
+                    <button id="close-cal-day-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="cal-day-modal-body">
+                    <div class="cal-day-section">
+                        <h3>🚗 Samochody na ten dzień:</h3>
+                        <div id="cal-day-cars-list" class="cal-day-cars-list">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="cal-day-section glass-box">
+                        <h3>➕ Przypisz z listy istniejących aut:</h3>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <select id="cal-assign-car-select" class="form-select" style="flex: 1; min-width: 200px;">
+                                <option value="">Wybierz auto z bazy...</option>
+                            </select>
+                            <button id="cal-assign-car-btn" class="btn-primary">Przypisz Datę</button>
+                        </div>
+                    </div>
+
+                    <div class="cal-day-section">
+                        <button id="cal-create-new-car-btn" class="btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981, #059669);">
+                            ✨ Dodaj Nowe Auto Na Ten Dzień
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Modal for Owners -->
+        <div id="notif-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>🔔 Powiadomienia Właścicieli</h2>
+                    <button id="close-notif-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="notif-actions-bar" style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                    <button id="clear-notifs-btn" class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;">Oznacz jako przeczytane</button>
+                </div>
+                <div id="notif-list" class="notif-list">
+                    <!-- Notifications injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PWA Install Modal -->
+        <div id="pwa-modal" class="modal">
+            <div class="modal-content glass pwa-modal-content">
+                <div class="modal-header">
+                    <h2>📲 Pobierz Aplikację EcoCarPro</h2>
+                    <button id="close-pwa-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="pwa-install-body" style="text-align: center; padding: 1rem 0;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📱</div>
+                    <h3>Zainstaluj na Ekranie Głównym Telefonu</h3>
+                    <p style="margin: 1rem 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.5;">
+                        Zainstaluj aplikację EcoCarPro bezpośrednio na pulpicie telefonu, aby mieć natychmiastowy dostęp bez wpisywania adresu!
+                    </p>
+                    
+                    <div id="pwa-native-install-box" style="margin-bottom: 1.5rem;">
+                        <button id="pwa-trigger-install-btn" class="btn-primary" style="width: 100%; font-size: 1.1rem; padding: 1rem;">
+                            🚀 Zainstaluj Teraz Aplikację
+                        </button>
+                    </div>
+
+                    <div class="pwa-instructions glass-box" style="text-align: left; padding: 1rem; border-radius: 12px; font-size: 0.9rem; margin-bottom: 1.5rem;">
+                        <strong>Instrukcja dla iOS / Safari & Chrome:</strong>
+                        <ol style="margin-left: 1.2rem; margin-top: 0.5rem; line-height: 1.6;">
+                            <li>Kliknij ikonę <strong>Udostępnij [⎋]</strong> na pasku przeglądarki.</li>
+                            <li>Wybierz opcję <strong>"Dodaj do ekranu początkowego" (Add to Home Screen)</strong>.</li>
+                            <li>Zatwierdź przyciskiem <strong>Dodaj</strong> – ikonka pojawi się na pulpicie!</li>
+                        </ol>
+                    </div>
+
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        Adres aplikacji: <strong style="color: var(--primary-green);">EcoCarPro Web App</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Confirmation Modal -->
+        <div id="confirm-modal" class="modal">
+            <div class="modal-content glass confirm-content">
+                <h3>Potwierdzenie</h3>
+                <p id="confirm-message">Czy na pewno chcesz wykonać tę operację?</p>
+                <div class="confirm-actions">
+                    <button id="confirm-cancel" class="btn-secondary">Anuluj</button>
+                    <button id="confirm-ok" class="btn-primary danger">Usuń</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Modal -->
+        <div id="report-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>Opcje Raportu</h2>
+                    <button id="close-report-modal" class="btn-close">&times;</button>
+                </div>
+                <form id="report-form">
+                    <input type="hidden" id="report-car-id">
+                    <div class="form-group">
+                        <label for="report-hours">Ile godzin nam to zeszło</label>
+                        <input type="number" id="report-hours" placeholder="np. 5">
+                    </div>
+                    <div class="form-group" id="ceramic-options-group" style="display: none;">
+                        <label for="report-ceramic">Marka nakładanej Ceramiki</label>
+                        <select id="report-ceramic" class="form-select">
+                            <option value="Brak (Inna)">Brak / Inna</option>
+                            <option value="Aqua">Aqua</option>
+                            <option value="Gtechniq">Gtechniq</option>
+                            <option value="Waxoyl">Waxoyl</option>
+                        </select>
+                    </div>
+                    <div class="form-group ai-generator-box"
+                        style="background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 10px; border: 1px dashed rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
+                        <label for="report-keywords" style="color: var(--primary-green); font-weight: 600;">Wygeneruj
+                            profesjonalny opis (Symulacja AI)</label>
+                        <input type="text" id="report-keywords"
+                            placeholder="Wpisz parę słów: np. pranie foteli, usunięcie rys, twardy wosk..."
+                            style="margin-bottom: 10px;">
+                        <button type="button" id="btn-generate-ai" class="btn-secondary"
+                            style="width: 100%; border-color: var(--primary-green); color: var(--primary-green); font-weight: bold; margin-bottom: 10px;">✨
+                            Generuj Opis AI</button>
+                        <label for="report-notes">Gotowy opis raportu na podstawie słów kluczowych</label>
+                        <textarea id="report-notes" rows="4"
+                            placeholder="Opis usługi zostanie tutaj wygenerowany..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Zdjęcia PRZED</label>
+                        <input type="file" id="report-photos-before" accept="image/*" multiple>
+                    </div>
+                    <div class="form-group">
+                        <label>Zdjęcia PO</label>
+                        <input type="file" id="report-photos-after" accept="image/*" multiple>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-submit">Pobierz PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="help-modal" class="modal">
+            <div class="modal-content glass help-content">
+                <div class="modal-header">
+                    <h2>Informacje o Aplikacji</h2>
+                    <button id="close-help-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="dev-info">
+                    <p>EcoCarPro - System Zarządzania Flotą</p>
+                    <p>App Deweloperem jest <strong>Adrian Chromiańczuk</strong></p>
+                    <p>Wszelkie prawa są zastrzeżone.</p>
+                    <hr>
+                    <p><strong>Kontakt & Wsparcie:</strong></p>
+                    <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chrom@gmail.com</a></p>
+                    <p>📞 <a href="tel:+48605595049">605 595 049</a></p>
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- Report Modal -->
-    <div id="report-modal" class="modal">
-        <div class="modal-content glass">
-            <div class="modal-header">
-                <h2>Opcje Raportu</h2>
-                <button id="close-report-modal" class="btn-close">&times;</button>
-            </div>
-            <form id="report-form">
-                <input type="hidden" id="report-car-id">
-                <div class="form-group">
-                    <label for="report-hours">Ile godzin nam to zeszło</label>
-                    <input type="number" id="report-hours" placeholder="np. 5">
-                </div>
-                <div class="form-group" id="ceramic-options-group" style="display: none;">
-                    <label for="report-ceramic">Marka nakładanej Ceramiki</label>
-                    <select id="report-ceramic" class="form-select">
-                        <option value="Brak (Inna)">Brak / Inna</option>
-                        <option value="Aqua">Aqua</option>
-                        <option value="Gtechniq">Gtechniq</option>
-                        <option value="Waxoyl">Waxoyl</option>
-                    </select>
-                </div>
-                <div class="form-group ai-generator-box"
-                    style="background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 10px; border: 1px dashed rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
-                    <label for="report-keywords" style="color: var(--primary-green); font-weight: 600;">Wygeneruj
-                        profesjonalny opis (Symulacja AI)</label>
-                    <input type="text" id="report-keywords"
-                        placeholder="Wpisz parę słów: np. pranie foteli, usunięcie rys, twardy wosk..."
-                        style="margin-bottom: 10px;">
-                    <button type="button" id="btn-generate-ai" class="btn-secondary"
-                        style="width: 100%; border-color: var(--primary-green); color: var(--primary-green); font-weight: bold; margin-bottom: 10px;">✨
-                        Generuj Opis AI</button>
-                    <label for="report-notes">Gotowy opis raportu na podstawie słów kluczowych</label>
-                    <textarea id="report-notes" rows="4"
-                        placeholder="Opis usługi zostanie tutaj wygenerowany..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Zdjęcia PRZED</label>
-                    <input type="file" id="report-photos-before" accept="image/*" multiple>
-                </div>
-                <div class="form-group">
-                    <label>Zdjęcia PO</label>
-                    <input type="file" id="report-photos-after" accept="image/*" multiple>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn-submit">Pobierz PDF</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Help Modal -->
-    <div id="help-modal" class="modal">
-        <div class="modal-content glass help-content">
-            <div class="modal-header">
-                <h2>Informacje</h2>
-                <button id="close-help-modal" class="btn-close">&times;</button>
-            </div>
-            <div class="dev-info">
-                <p>App Deweloperem jest <strong>Adrian Chromiańczuk</strong></p>
-                <p>Wszelkie prawa są zastrzeżone.</p>
-                <hr>
-                <p><strong>Kontakt:</strong></p>
-                <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chrom@gmail.com</a></p>
-                <p>📞 <a href="tel:+48605595049">605 595 049</a></p>
-            </div>
-        </div>
-    </div>
-
-
 
     <div id="toast-container"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>

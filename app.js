@@ -32,20 +32,38 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const carsCol = collection(db, 'cars');
-const calendarCol = collection(db, 'calendar_events');
+const notificationsCol = collection(db, 'notifications');
 
 // State Management
 let cars = [];
-let calendarEvents = [];
-let currentView = 'active'; // 'active', 'archive', 'calendar' or 'admin'
-let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', or 'Monia'
+let notifications = [];
+let currentView = 'active'; // 'active', 'calendar', 'archive', or 'admin'
+let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Michał', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
-let selectedYear = new Date().getFullYear();
-let selectedDateStr = '';
-let assignMode = 'panel';
+
+// Calendar State
+let calCurrentMonth = new Date().getMonth();
+let calCurrentYear = new Date().getFullYear();
+let selectedCalDate = null;
+let customTodos = [];
+let deferredPrompt = null;
+
+// Helper: Check if user is Owner (Właściciel)
+function isOwner(user = currentUser) {
+    if (!user) return false;
+    const u = user.toLowerCase();
+    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
+}
 
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
+const calendarSection = document.getElementById('calendar-section');
+const calendarGrid = document.getElementById('calendar-grid');
+const calMonthYearEl = document.getElementById('cal-month-year');
+const calPrevMonthBtn = document.getElementById('cal-prev-month');
+const calNextMonthBtn = document.getElementById('cal-next-month');
+const calTodayBtn = document.getElementById('cal-today-btn');
+
 const carModal = document.getElementById('car-modal');
 const carForm = document.getElementById('car-form');
 const addCarBtn = document.getElementById('add-car-btn');
@@ -57,12 +75,22 @@ const modalTitle = document.getElementById('modal-title');
 const themeToggleBtn = document.getElementById('theme-toggle');
 const sunIcon = document.getElementById('sun-icon');
 const moonIcon = document.getElementById('moon-icon');
+
+// Navigation Tabs
 const viewActiveBtn = document.getElementById('view-active');
-const viewArchiveBtn = document.getElementById('view-archive');
 const viewCalendarBtn = document.getElementById('view-calendar');
+const viewArchiveBtn = document.getElementById('view-archive');
 const viewAdminBtn = document.getElementById('view-admin');
+
+// Mobile Bottom Nav Items
+const mobNavActive = document.getElementById('mob-nav-active');
+const mobNavCalendar = document.getElementById('mob-nav-calendar');
+const mobNavArchive = document.getElementById('mob-nav-archive');
+const mobNavAdmin = document.getElementById('mob-nav-admin');
+const mobNavNotif = document.getElementById('mob-nav-notif');
+const mobNotifBadge = document.getElementById('mob-notif-badge');
+
 const adminSection = document.getElementById('admin-section');
-const calendarSection = document.getElementById('calendar-section');
 const logsList = document.getElementById('logs-list');
 const loginOverlay = document.getElementById('login-overlay');
 const loginBtn = document.getElementById('login-btn');
@@ -85,28 +113,48 @@ const periodBtns = document.querySelectorAll('.period-btn');
 const reportModal = document.getElementById('report-modal');
 const reportForm = document.getElementById('report-form');
 const closeReportModalBtn = document.getElementById('close-report-modal');
-const reportCarIdInput = document.getElementById('report-car-id');
 
+// Notifications UI Elements
+const notifBtn = document.getElementById('notif-btn');
+const notifBadge = document.getElementById('notif-badge');
+const notifModal = document.getElementById('notif-modal');
+const closeNotifModalBtn = document.getElementById('close-notif-modal');
+const notifList = document.getElementById('notif-list');
+const clearNotifsBtn = document.getElementById('clear-notifs-btn');
 
-// Calendar DOM Elements
-const calendarMonthsRow = document.getElementById('calendar-months-row');
-const calendarCurrentYearEl = document.getElementById('calendar-current-year');
-const calendarPrevYearBtn = document.getElementById('calendar-prev-year');
-const calendarNextYearBtn = document.getElementById('calendar-next-year');
-const selectedDayLabel = document.getElementById('selected-day-label');
-const timelinePanel = document.getElementById('timeline-panel');
-const timelineEventsEl = document.getElementById('timeline-events');
-const timelineAddForm = document.getElementById('timeline-add-form');
-const tabAssignPanel = document.getElementById('tab-assign-panel');
-const tabAssignManual = document.getElementById('tab-assign-manual');
-const groupAssignPanel = document.getElementById('group-assign-panel');
-const groupAssignManual = document.getElementById('group-assign-manual');
-const assignCarSelect = document.getElementById('assign-car-select');
-const assignCarManualInput = document.getElementById('assign-car-manual-input');
-const assignCarTime = document.getElementById('assign-car-time');
-const btnAddToTimeline = document.getElementById('btn-add-to-timeline');
+// Calendar Day Modal Elements
+const calDayModal = document.getElementById('calendar-day-modal');
+const closeCalDayModalBtn = document.getElementById('close-cal-day-modal');
+const calDayModalTitle = document.getElementById('cal-day-modal-title');
+const calDayCarsList = document.getElementById('cal-day-cars-list');
+const calAssignCarSelect = document.getElementById('cal-assign-car-select');
+const calAssignCarBtn = document.getElementById('cal-assign-car-btn');
+const calCreateNewCarBtn = document.getElementById('cal-create-new-car-btn');
 
-// Initialize Listener - Real-time Sanpshot
+// PWA Install Elements
+const pwaInstallBtn = document.getElementById('pwa-install-btn');
+const pwaModal = document.getElementById('pwa-modal');
+const closePwaModalBtn = document.getElementById('close-pwa-modal');
+const pwaTriggerInstallBtn = document.getElementById('pwa-trigger-install-btn');
+
+// Custom Todos elements
+const customTodoInput = document.getElementById('custom-todo-input');
+const addCustomTodoBtn = document.getElementById('add-custom-todo-btn');
+const customTodosList = document.getElementById('custom-todos-list');
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('Service Worker reg error', err));
+    });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+});
+
+// Initialize Listener - Real-time Snapshots
 function init() {
     // Theme setup
     const savedTheme = localStorage.getItem('ecoCarTheme') || 'dark';
@@ -125,7 +173,6 @@ function init() {
         showToast("Wylogowano automatycznie po 5 odświeżeniach strony.", "info");
     } else {
         localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
-        // If we have a saved user, show the app
         if (currentUser) {
             const checkLock = async () => {
                 const lockDoc = await getDoc(doc(db, 'settings', currentUser.toLowerCase() + '_lock'));
@@ -144,86 +191,89 @@ function init() {
         }
     }
 
+    // Cars Realtime Listener
     const q = query(carsCol, orderBy('dateAdded', 'desc'));
     onSnapshot(q, (snapshot) => {
         cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         processAutoArchiving();
         renderCars();
+        renderCalendar();
         updateStats();
         updateCountdowns();
-        // Update select options if calendar open
-        if (selectedDateStr) {
-            const activeCars = cars.filter(c => !c.archived);
-            const val = assignCarSelect.value;
-            assignCarSelect.innerHTML = '<option value="">Wybierz pojazd...</option>' + 
-                activeCars.map(c => `<option value="${c.id}">${c.brand} [${c.plateNum || 'brak tablic'}]</option>`).join('');
-            assignCarSelect.value = val;
-        }
     });
 
-    const calQ = query(calendarCol, orderBy('timestamp', 'desc'));
-    onSnapshot(calQ, (snapshot) => {
-        calendarEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderCalendar();
-        if (selectedDateStr) {
-            renderTimeline(selectedDateStr);
-        }
+    // Notifications Realtime Listener
+    const notifQ = query(notificationsCol, orderBy('timestamp', 'desc'), limit(50));
+    onSnapshot(notifQ, (snapshot) => {
+        notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        updateNotificationsUI();
     });
 
     setInterval(updateCountdowns, 1000);
 
-    // View Switching
-    viewActiveBtn.onclick = () => {
-        currentView = 'active';
-        viewActiveBtn.classList.add('active');
-        viewArchiveBtn.classList.remove('active');
-        viewCalendarBtn.classList.remove('active');
-        viewAdminBtn.classList.remove('active');
-        adminSection.style.display = 'none';
-        calendarSection.style.display = 'none';
-        archiveControls.style.display = 'none';
-        carsGrid.style.display = 'grid';
-        renderCars(searchInput.value);
+    // Navigation Click Handlers
+    setupNavigation();
+
+    // Login Handler
+    setupLogin();
+
+    // Calendar Navigation Handlers
+    setupCalendarNav();
+
+    // PWA Install Handlers
+    setupPWA();
+
+    // Custom Todos Handler
+    if (addCustomTodoBtn && customTodoInput) {
+        addCustomTodoBtn.onclick = () => {
+            const text = customTodoInput.value.trim();
+            if (text) {
+                customTodos.push({ text: text, done: false });
+                customTodoInput.value = '';
+                renderCustomTodosInForm();
+            }
+        };
+    }
+}
+
+function setupNavigation() {
+    const switchTab = (targetView) => {
+        currentView = targetView;
+        viewActiveBtn.classList.toggle('active', targetView === 'active');
+        viewCalendarBtn.classList.toggle('active', targetView === 'calendar');
+        viewArchiveBtn.classList.toggle('active', targetView === 'archive');
+        viewAdminBtn.classList.toggle('active', targetView === 'admin');
+
+        // Mobile Nav sync
+        mobNavActive.classList.toggle('active', targetView === 'active');
+        mobNavCalendar.classList.toggle('active', targetView === 'calendar');
+        mobNavArchive.classList.toggle('active', targetView === 'archive');
+        mobNavAdmin.classList.toggle('active', targetView === 'admin');
+
+        // Display sections
+        carsGrid.style.display = (targetView === 'active' || targetView === 'archive') ? 'grid' : 'none';
+        calendarSection.style.display = (targetView === 'calendar') ? 'block' : 'none';
+        adminSection.style.display = (targetView === 'admin') ? 'block' : 'none';
+        archiveControls.style.display = (targetView === 'archive') ? 'flex' : 'none';
+
+        if (targetView === 'active' || targetView === 'archive') {
+            renderCars(searchInput.value);
+        } else if (targetView === 'calendar') {
+            renderCalendar();
+        } else if (targetView === 'admin') {
+            loadAdminData();
+        }
     };
 
-    viewArchiveBtn.onclick = () => {
-        currentView = 'archive';
-        viewActiveBtn.classList.remove('active');
-        viewArchiveBtn.classList.add('active');
-        viewCalendarBtn.classList.remove('active');
-        viewAdminBtn.classList.remove('active');
-        adminSection.style.display = 'none';
-        calendarSection.style.display = 'none';
-        archiveControls.style.display = 'flex';
-        carsGrid.style.display = 'grid';
-        renderCars(searchInput.value);
-    };
+    viewActiveBtn.onclick = () => switchTab('active');
+    viewCalendarBtn.onclick = () => switchTab('calendar');
+    viewArchiveBtn.onclick = () => switchTab('archive');
+    viewAdminBtn.onclick = () => switchTab('admin');
 
-    viewCalendarBtn.onclick = () => {
-        currentView = 'calendar';
-        viewActiveBtn.classList.remove('active');
-        viewArchiveBtn.classList.remove('active');
-        viewCalendarBtn.classList.add('active');
-        viewAdminBtn.classList.remove('active');
-        adminSection.style.display = 'none';
-        calendarSection.style.display = 'block';
-        archiveControls.style.display = 'none';
-        carsGrid.style.display = 'none';
-        renderCalendar();
-    };
-
-    viewAdminBtn.onclick = () => {
-        currentView = 'admin';
-        viewActiveBtn.classList.remove('active');
-        viewArchiveBtn.classList.remove('active');
-        viewCalendarBtn.classList.remove('active');
-        viewAdminBtn.classList.add('active');
-        adminSection.style.display = 'block';
-        calendarSection.style.display = 'none';
-        archiveControls.style.display = 'none';
-        carsGrid.style.display = 'none';
-        loadAdminData();
-    };
+    mobNavActive.onclick = () => switchTab('active');
+    mobNavCalendar.onclick = () => switchTab('calendar');
+    mobNavArchive.onclick = () => switchTab('archive');
+    mobNavAdmin.onclick = () => switchTab('admin');
 
     periodBtns.forEach(btn => {
         btn.onclick = () => {
@@ -233,8 +283,9 @@ function init() {
             renderCars(searchInput.value);
         };
     });
+}
 
-    // Login Logic
+function setupLogin() {
     loginBtn.onclick = async () => {
         const userVal = loginUserInput.value.trim();
         const passVal = loginPassInput.value.trim();
@@ -249,237 +300,101 @@ function init() {
         }
 
         const canonicalUser = userVal.toLowerCase();
-        const allowedUsers = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
-
-        if (allowedUsers.includes(canonicalUser)) {
-            try {
-                const config = await getUserConfig(canonicalUser);
-                
-                if (config.isLocked) {
-                    showLockedMessage(config.suspended || false);
-                    return;
-                }
-
-                if (config.password === passVal) {
-                    currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
-                    localStorage.setItem('ecoCarUser', currentUser);
-                    localStorage.setItem('ecoCarReloadCount', '0');
-
-                    loginOverlay.style.display = 'none';
-                    appContainer.style.display = 'block';
-                    loggedUserNameEl.textContent = currentUser;
-                    showToast(`Zalogowano jako ${currentUser}`, "success");
-
-                    loginPassInput.value = '';
-                    loginUserInput.value = '';
-                    lockedMsgEl.style.display = 'none';
-
-                    // Reset failed attempts in database
-                    await updateUserConfig(canonicalUser, { failedAttempts: 0 });
-
-                    if (currentUser === 'Tomek' || currentUser === 'Monia' || currentUser === 'Admin') {
-                        try {
-                            const settingKey = currentUser.toLowerCase() + '_login';
-                            await setDoc(doc(db, 'settings', settingKey), {
-                                lastLogin: new Date().toISOString()
-                            }, { merge: true });
-                        } catch (e) { console.error("Update login error", e); }
-                    }
-                    logAction(`Zalogowano użytkownika: ${currentUser}`);
-                    updateUIForRole();
-                    renderCars();
-                } else {
-                    const newFailed = (config.failedAttempts || 0) + 1;
-                    const isNowLocked = newFailed >= 3;
-                    
-                    await updateUserConfig(canonicalUser, {
-                        failedAttempts: newFailed,
-                        isLocked: isNowLocked
-                    });
-
-                    if (isNowLocked) {
-                        showLockedMessage(false);
-                        showToast("❌ Błędne hasło. Konto zostało zablokowane po 3 nieudanych próbach!", "error");
-                    } else {
-                        showToast(`Błędne hasło! Pozostało prób: ${3 - newFailed}`, "error");
-                    }
-                }
-            } catch (err) {
-                console.error("Login database error", err);
-                showToast("Błąd bazy danych podczas logowania", "error");
-            }
-        } else {
-            showToast("Błędne hasło lub nieznany użytkownik!", "error");
-        }
-    };
-
-    function showLockedMessage(isSuspended = false) {
-        const title = isSuspended ? "Konto Zawieszone" : "Konto Zablokowane";
-        const message = isSuspended ? "Twoje konto zostało zawieszone przez administratora." : "Przekroczono limit prób logowania. Skontaktuj się z administratorem, aby odblokować dostęp:";
-        
-        lockedMsgEl.innerHTML = `
-            <div class="locked-container" style="${isSuspended ? 'border-color: #f59e0b; background: rgba(245, 158, 11, 0.1);' : ''}">
-                <h3 style="${isSuspended ? 'color: #f59e0b;' : ''}">${title}</h3>
-                <p>${message}</p>
-                <a href="tel:+48605595049" class="phone-link" style="${isSuspended ? 'color: #f59e0b;' : ''}">📞 605 595 049</a>
-            </div>
-        `;
-        lockedMsgEl.style.display = 'block';
-        loginBtn.style.display = 'none';
-        loginUserInput.disabled = true;
-        loginPassInput.disabled = true;
-        
-        if (isSuspended) {
-            showToast("Twoje konto zostało zawieszone!", "error");
-        }
-    }
-
-    updateUIForRole();
-
-    // Calendar Year Navigation
-    calendarPrevYearBtn.onclick = () => {
-        selectedYear--;
-        calendarCurrentYearEl.textContent = selectedYear;
-        renderCalendar();
-    };
-
-    calendarNextYearBtn.onclick = () => {
-        selectedYear++;
-        calendarCurrentYearEl.textContent = selectedYear;
-        renderCalendar();
-    };
-
-    // Calendar Add Form Mode Selection
-    tabAssignPanel.onclick = () => {
-        assignMode = 'panel';
-        tabAssignPanel.classList.add('active');
-        tabAssignManual.classList.remove('active');
-        groupAssignPanel.style.display = 'block';
-        groupAssignManual.style.display = 'none';
-    };
-
-    tabAssignManual.onclick = () => {
-        assignMode = 'manual';
-        tabAssignPanel.classList.remove('active');
-        tabAssignManual.classList.add('active');
-        groupAssignPanel.style.display = 'none';
-        groupAssignManual.style.display = 'block';
-    };
-
-    // Calendar Save Assignment
-    btnAddToTimeline.onclick = async () => {
-        if (!selectedDateStr) {
-            showToast("Wybierz najpierw dzień z kalendarza!", "error");
-            return;
-        }
-
-        let carId = "";
-        let customText = "";
-
-        if (assignMode === 'panel') {
-            carId = assignCarSelect.value;
-            if (!carId) {
-                showToast("Wybierz pojazd z bazy", "error");
-                return;
-            }
-        } else {
-            customText = assignCarManualInput.value.trim();
-            if (!customText) {
-                showToast("Wpisz model lub opis pojazdu", "error");
-                return;
-            }
-        }
-
-        const timeVal = assignCarTime.value || "";
-
-        const eventData = {
-            date: selectedDateStr,
-            carId: carId,
-            customText: customText,
-            time: timeVal,
-            addedBy: currentUser || "System",
-            timestamp: new Date().toISOString()
-        };
 
         try {
-            await addDoc(collection(db, 'calendar_events'), eventData);
-            showToast("Dodano pojazd do planu dnia", "success");
-            logAction(`Dodano pojazd do kalendarza na dzień ${selectedDateStr}`);
-            
-            // Reset input form
-            assignCarSelect.value = "";
-            assignCarManualInput.value = "";
-            assignCarTime.value = "";
-        } catch (err) {
-            showToast("Błąd zapisu przypisania", "error");
+            const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
+            if (lockDoc.exists() && lockDoc.data().locked) {
+                showLockedMessage(lockDoc.data().suspended || false);
+                return;
+            }
+        } catch (e) { console.error("Check lock error", e); }
+
+        const validUsers = {
+            'admin': 'system02',
+            'tomek': 'tommar',
+            'monia': 'wanda',
+            'adam': '767211439',
+            'michal': '192837465',
+            'lukasz': '564738291',
+            'nastka': '908172635'
+        };
+
+        if (validUsers[canonicalUser]) {
+            if (validUsers[canonicalUser] === passVal) {
+                localStorage.removeItem('ecoCarFailedAttempts');
+                currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
+                if (canonicalUser === 'michal') currentUser = 'Michał';
+                if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
+
+                localStorage.setItem('ecoCarUser', currentUser);
+                localStorage.setItem('ecoCarReloadCount', '0');
+
+                loginOverlay.style.display = 'none';
+                appContainer.style.display = 'block';
+                loggedUserNameEl.textContent = currentUser;
+                showToast(`Zalogowano jako ${currentUser}`, "success");
+
+                loginPassInput.value = '';
+                loginUserInput.value = '';
+                lockedMsgEl.style.display = 'none';
+
+                try {
+                    const settingKey = canonicalUser + '_login';
+                    await setDoc(doc(db, 'settings', settingKey), {
+                        lastLogin: new Date().toISOString()
+                    }, { merge: true });
+                } catch (e) { console.error("Update login error", e); }
+
+                logAction(`Zalogowano użytkownika: ${currentUser}`);
+                updateUIForRole();
+                renderCars();
+            } else {
+                handleFailedLogin(canonicalUser);
+            }
+        } else {
+            handleFailedLogin(canonicalUser);
         }
     };
+}
 
-    // Admin toggles lock for Tomek
-    const tomekLockBtn = document.getElementById('btn-tomek-toggle-lock');
-    if (tomekLockBtn) {
-        tomekLockBtn.onclick = async () => {
-            const config = await getUserConfig('tomek');
-            const newLocked = !config.isLocked;
-            await updateUserConfig('tomek', {
-                isLocked: newLocked,
-                failedAttempts: newLocked ? 3 : 0
+function showLockedMessage(isSuspended = false) {
+    const title = isSuspended ? "Konto Zawieszone" : "Konto Zablokowane";
+    const message = isSuspended ? "Twoje konto zostało zawieszone przez administratora." : "Przekroczono limit prób logowania. Skontaktuj się z administratorem, aby odblokować dostęp:";
+
+    lockedMsgEl.innerHTML = `
+        <div class="locked-container" style="${isSuspended ? 'border-color: #f59e0b; background: rgba(245, 158, 11, 0.1);' : ''}">
+            <h3 style="${isSuspended ? 'color: #f59e0b;' : ''}">${title}</h3>
+            <p>${message}</p>
+            <a href="tel:+48605595049" class="phone-link" style="${isSuspended ? 'color: #f59e0b;' : ''}">📞 605 595 049</a>
+        </div>
+    `;
+    lockedMsgEl.style.display = 'block';
+    loginBtn.style.display = 'none';
+    loginUserInput.disabled = true;
+    loginPassInput.disabled = true;
+
+    if (isSuspended) {
+        showToast("Twoje konto zostało zawieszone!", "error");
+    }
+}
+
+async function handleFailedLogin(username) {
+    let attempts = parseInt(localStorage.getItem('ecoCarFailedAttempts') || '0', 10);
+    attempts++;
+    localStorage.setItem('ecoCarFailedAttempts', attempts.toString());
+
+    if (attempts >= 3) {
+        try {
+            await setDoc(doc(db, 'settings', username + '_lock'), {
+                locked: true,
+                timestamp: new Date().toISOString()
             });
-            showToast(newLocked ? "Konto Tomasza zostało ZABLOKOWANE." : "Konto Tomasza zostało ODBLOKOWANE.", newLocked ? "error" : "success");
-            logAction(newLocked ? "Zablokowano konto Tomasza" : "Odblokowano konto Tomasza");
-            loadAdminData();
-        };
+        } catch (e) { console.error("Lock error", e); }
+        showLockedMessage();
+        showToast("Konto zostało zablokowane!", "error");
+    } else {
+        showToast(`Błędne dane! Pozostało prób: ${3 - attempts}`, "error");
     }
-
-    // Admin saves password for Tomek
-    const tomekSavePassBtn = document.getElementById('btn-tomek-save-password');
-    if (tomekSavePassBtn) {
-        tomekSavePassBtn.onclick = async () => {
-            const newPass = document.getElementById('tomek-password-input').value.trim();
-            if (!newPass) {
-                showToast("Hasło nie może być puste", "error");
-                return;
-            }
-            await updateUserConfig('tomek', { password: newPass });
-            showToast("Zmieniono hasło dla Tomasza.", "success");
-            logAction("Zmieniono hasło dla Tomasza");
-            loadAdminData();
-        };
-    }
-
-    // Admin toggles lock for Monia
-    const moniaLockBtn = document.getElementById('btn-monia-toggle-lock');
-    if (moniaLockBtn) {
-        moniaLockBtn.onclick = async () => {
-            const config = await getUserConfig('monia');
-            const newLocked = !config.isLocked;
-            await updateUserConfig('monia', {
-                isLocked: newLocked,
-                failedAttempts: newLocked ? 3 : 0
-            });
-            showToast(newLocked ? "Konto Moniki zostało ZABLOKOWANE." : "Konto Moniki zostało ODBLOKOWANE.", newLocked ? "error" : "success");
-            logAction(newLocked ? "Zablokowano konto Moniki" : "Odblokowano konto Moniki");
-            loadAdminData();
-        };
-    }
-
-    // Admin saves password for Monia
-    const moniaSavePassBtn = document.getElementById('btn-monia-save-password');
-    if (moniaSavePassBtn) {
-        moniaSavePassBtn.onclick = async () => {
-            const newPass = document.getElementById('monia-password-input').value.trim();
-            if (!newPass) {
-                showToast("Hasło nie może być puste", "error");
-                return;
-            }
-            await updateUserConfig('monia', { password: newPass });
-            showToast("Zmieniono hasło dla Moniki.", "success");
-            logAction("Zmieniono hasło dla Moniki");
-            loadAdminData();
-        };
-    }
-
-
 }
 
 async function logAction(actionText) {
@@ -494,14 +409,27 @@ async function logAction(actionText) {
 
 function updateUIForRole() {
     const role = (currentUser || '').toLowerCase();
+    const owner = isOwner(currentUser);
+
+    // Admin Panel access
     if (role === 'admin') {
         viewAdminBtn.style.display = 'block';
+        mobNavAdmin.style.display = 'flex';
     } else {
         viewAdminBtn.style.display = 'none';
-        // If current view is admin and user is not admin, switch to active
+        mobNavAdmin.style.display = 'none';
         if (currentView === 'admin') {
             viewActiveBtn.click();
         }
+    }
+
+    // Owner Notifications Button visibility
+    if (owner) {
+        notifBtn.style.display = 'flex';
+        mobNavNotif.style.display = 'flex';
+    } else {
+        notifBtn.style.display = 'none';
+        mobNavNotif.style.display = 'none';
     }
 
     if (role === 'monia') {
@@ -511,232 +439,289 @@ function updateUIForRole() {
     }
 }
 
-async function loadAdminData() {
-    // Helper to update status cards
-    const updateStatusCard = async (userId, cardId) => {
-        const docRef = doc(db, 'settings', userId + '_login');
-        const d = await getDoc(docRef);
-        const card = document.getElementById(cardId);
-        if (!card) return;
+// Notifications Logic for Owners
+function updateNotificationsUI() {
+    const unreadList = notifications.filter(n => !n.read);
+    const unreadCount = unreadList.length;
 
-        const timeEl = card.querySelector('.time');
-        const statusEl = card.querySelector('.status-indicator span');
-
-        if (d.exists()) {
-            const lastLogin = new Date(d.data().lastLogin);
-            timeEl.textContent = lastLogin.toLocaleString('pl-PL');
-
-            // Artificial "Online" check: if logged in within last 5 minutes
-            const diff = new Date() - lastLogin;
-            if (diff < 300000) {
-                statusEl.textContent = 'Online';
-                statusEl.className = 'online';
-            } else {
-                statusEl.textContent = 'Offline';
-                statusEl.className = 'offline';
-            }
-        }
-
-        // Check lock status from Firestore settings config
-        const config = await getUserConfig(userId);
-        const isLocked = config.isLocked;
-        
-        // Remove existing action buttons to prevent duplication
-        const existingBtn = card.querySelector('.unlock-btn');
-        if (existingBtn) existingBtn.remove();
-        
-        const actionBtn = document.createElement('button');
-        actionBtn.className = isLocked ? 'unlock-btn' : 'unlock-btn suspend-btn';
-        if (!isLocked) {
-            actionBtn.style.background = '#f59e0b'; // Orange for suspend
-        }
-        actionBtn.textContent = isLocked ? 'Odblokuj Konto' : 'Zawieś Konto';
-        
-        actionBtn.onclick = async () => {
-            const currentConf = await getUserConfig(userId);
-            const newLocked = !currentConf.isLocked;
-            await updateUserConfig(userId, {
-                isLocked: newLocked,
-                failedAttempts: newLocked ? 3 : 0
-            });
-            showToast(newLocked ? `Zawieszono/Zablokowano użytkownika ${userId}` : `Odblokowano użytkownika ${userId}`, newLocked ? "error" : "success");
-            logAction(newLocked ? `Zablokowano konto ${userId}` : `Odblokowano konto ${userId}`);
-            loadAdminData();
-        };
-        card.querySelector('.user-info').appendChild(actionBtn);
-
-        // Password Preview (Zaszyfrowany/Zamaskowany podgląd)
-        const pass = config.password;
-        if (pass) {
-            const existingPass = card.querySelector('.pass-preview');
-            if (existingPass) existingPass.remove();
-
-            const passContainer = document.createElement('div');
-            passContainer.className = 'pass-preview';
-            passContainer.style.fontSize = '0.75rem';
-            passContainer.style.marginTop = '10px';
-            passContainer.style.padding = '4px 8px';
-            passContainer.style.background = 'rgba(255,255,255,0.05)';
-            passContainer.style.borderRadius = '6px';
-            passContainer.style.color = 'var(--text-muted)';
-            
-            const maskedPass = '●'.repeat(pass.length);
-            passContainer.innerHTML = `🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span> <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-left:5px;">POKAŻ</button>`;
-            
-            passContainer.querySelector('.btn-show-pass').onclick = (e) => {
-                const valEl = passContainer.querySelector('.pass-val');
-                const isMasked = valEl.textContent.includes('●');
-                valEl.textContent = isMasked ? valEl.dataset.real : '●'.repeat(pass.length);
-                e.target.textContent = isMasked ? 'UKRYJ' : 'POKAŻ';
-            };
-            
-            card.querySelector('.user-info').appendChild(passContainer);
-        }
-    };
-
-    const userIds = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
-    for (const userId of userIds) {
-        await updateStatusCard(userId, 'status-' + userId);
+    if (unreadCount > 0 && isOwner(currentUser)) {
+        notifBadge.style.display = 'flex';
+        notifBadge.textContent = unreadCount;
+        mobNotifBadge.style.display = 'flex';
+        mobNotifBadge.textContent = unreadCount;
+    } else {
+        notifBadge.style.display = 'none';
+        mobNotifBadge.style.display = 'none';
     }
 
-    // Load lock and password configuration for Tomek and Monia custom fields
-    const loadUserConfigToAdmin = async (userId) => {
-        const config = await getUserConfig(userId);
-        
-        const lockStatusEl = document.getElementById(`${userId}-lock-status`);
-        const failedAttemptsEl = document.getElementById(`${userId}-failed-attempts`);
-        const passwordInput = document.getElementById(`${userId}-password-input`);
-        const toggleLockBtn = document.getElementById(`btn-${userId}-toggle-lock`);
+    if (notifList) {
+        if (notifications.length === 0) {
+            notifList.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 1.5rem;">Brak powiadomień.</p>';
+        } else {
+            notifList.innerHTML = notifications.map(n => {
+                const date = new Date(n.timestamp).toLocaleString('pl-PL');
+                return `
+                    <div class="notif-item ${n.read ? '' : 'unread'}">
+                        <div style="font-weight: 600;">${n.text}</div>
+                        <div class="notif-time">⏱️ ${date}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+}
 
-        if (lockStatusEl) {
-            lockStatusEl.textContent = config.isLocked ? "TAK" : "NIE";
-            lockStatusEl.style.color = config.isLocked ? "#ef4444" : "#10b981";
-        }
-        if (failedAttemptsEl) {
-            failedAttemptsEl.textContent = `${config.failedAttempts || 0} / 3`;
-        }
-        if (passwordInput && document.activeElement !== passwordInput) {
-            passwordInput.value = config.password || '';
-        }
-        if (toggleLockBtn) {
-            toggleLockBtn.textContent = config.isLocked ? "ODBLOKUJ KONTO" : "ZABLOKUJ KONTO";
-            toggleLockBtn.style.background = config.isLocked ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
-            toggleLockBtn.style.borderColor = config.isLocked ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)";
-            toggleLockBtn.style.color = config.isLocked ? "#10b981" : "#ef4444";
-        }
+if (notifBtn) {
+    notifBtn.onclick = () => notifModal.classList.add('active');
+}
+
+if (mobNavNotif) {
+    mobNavNotif.onclick = () => notifModal.classList.add('active');
+}
+
+if (closeNotifModalBtn) {
+    closeNotifModalBtn.onclick = () => notifModal.classList.remove('active');
+}
+
+if (clearNotifsBtn) {
+    clearNotifsBtn.onclick = async () => {
+        try {
+            const unreadDocs = notifications.filter(n => !n.read);
+            for (const n of unreadDocs) {
+                await updateDoc(doc(db, 'notifications', n.id), { read: true });
+            }
+            showToast("Oznaczono powiadomienia jako przeczytane.", "success");
+        } catch (e) { console.error("Clear notifs error", e); }
     };
+}
 
-    await loadUserConfigToAdmin('tomek');
-    await loadUserConfigToAdmin('monia');
+// PWA Handlers
+function setupPWA() {
+    if (pwaInstallBtn) {
+        pwaInstallBtn.onclick = () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+            } else {
+                pwaModal.classList.add('active');
+            }
+        };
+    }
 
-    // Load last 10 logs for Tomek and Monia only
-    const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
-    const logsSnap = await getDocs(logsQ);
+    if (pwaTriggerInstallBtn) {
+        pwaTriggerInstallBtn.onclick = () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => { deferredPrompt = null; pwaModal.classList.remove('active'); });
+            } else {
+                showToast("Wybierz 'Udostępnij [⎋]' -> 'Dodaj do ekranu początkowego' w przeglądarce.", "info");
+            }
+        };
+    }
 
-    const filteredLogs = logsSnap.docs
-        .map(doc => doc.data())
-        .filter(log => log.user === 'Tomek' || log.user === 'Monia')
-        .slice(0, 10);
+    if (closePwaModalBtn) {
+        closePwaModalBtn.onclick = () => pwaModal.classList.remove('active');
+    }
+}
 
-    logsList.innerHTML = filteredLogs.map(log => {
-        const date = new Date(log.timestamp);
-        const userColor = log.user === 'Monia' ? '#ec4899' : '#10b981';
-        return `
-            <div class="log-item" style="border-left-color: ${userColor}">
-                <div class="log-content">
-                    <strong style="color: ${userColor}">${log.user}:</strong> 
-                    <span>${log.text}</span>
-                </div>
-                <span class="log-date">${date.toLocaleString('pl-PL')}</span>
+// Calendar View Logic (Square Day Tiles)
+function setupCalendarNav() {
+    if (calPrevMonthBtn) {
+        calPrevMonthBtn.onclick = () => {
+            calCurrentMonth--;
+            if (calCurrentMonth < 0) {
+                calCurrentMonth = 11;
+                calCurrentYear--;
+            }
+            renderCalendar();
+        };
+    }
+
+    if (calNextMonthBtn) {
+        calNextMonthBtn.onclick = () => {
+            calCurrentMonth++;
+            if (calCurrentMonth > 11) {
+                calCurrentMonth = 0;
+                calCurrentYear++;
+            }
+            renderCalendar();
+        };
+    }
+
+    if (calTodayBtn) {
+        calTodayBtn.onclick = () => {
+            calCurrentMonth = new Date().getMonth();
+            calCurrentYear = new Date().getFullYear();
+            renderCalendar();
+        };
+    }
+
+    if (closeCalDayModalBtn) {
+        closeCalDayModalBtn.onclick = () => calDayModal.classList.remove('active');
+    }
+
+    if (calCreateNewCarBtn) {
+        calCreateNewCarBtn.onclick = () => {
+            calDayModal.classList.remove('active');
+            modalTitle.textContent = `Dodaj Auto na Dzień: ${selectedCalDate}`;
+            carForm.reset();
+            document.getElementById('car-id').value = '';
+            document.getElementById('car-arrival-date').value = selectedCalDate || '';
+            document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
+            document.getElementById('car-priority').checked = false;
+            customTodos = [];
+            renderCustomTodosInForm();
+            carModal.classList.add('active');
+        };
+    }
+
+    if (calAssignCarBtn) {
+        calAssignCarBtn.onclick = async () => {
+            const carId = calAssignCarSelect.value;
+            if (!carId) {
+                showToast("Wybierz auto z listy!", "error");
+                return;
+            }
+            try {
+                await updateDoc(doc(db, 'cars', carId), {
+                    arrivalDate: selectedCalDate,
+                    archived: false // Also add to active main screen!
+                });
+                showToast(`Przypisano datę ${selectedCalDate} oraz dodano do ekranu głównego!`, "success");
+                logAction(`Przypisano datę ${selectedCalDate} do auta id:${carId}`);
+                calDayModal.classList.remove('active');
+                renderCalendar();
+            } catch (e) {
+                showToast("Błąd przypisywania daty", "error");
+            }
+        };
+    }
+}
+
+function renderCalendar() {
+    if (!calendarGrid || !calMonthYearEl) return;
+
+    const monthNames = [
+        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+    ];
+
+    calMonthYearEl.textContent = `${monthNames[calCurrentMonth]} ${calCurrentYear}`;
+
+    const firstDayOfMonth = new Date(calCurrentYear, calCurrentMonth, 1);
+    const daysInMonth = new Date(calCurrentYear, calCurrentMonth + 1, 0).getDate();
+    
+    // ISO Day of week (1=Monday, 7=Sunday)
+    let startingDay = firstDayOfMonth.getDay();
+    if (startingDay === 0) startingDay = 7; // Convert Sunday 0 to 7
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    calendarGrid.innerHTML = '';
+
+    // Empty tiles before first day
+    for (let i = 1; i < startingDay; i++) {
+        const emptyTile = document.createElement('div');
+        emptyTile.className = 'calendar-day-tile other-month';
+        calendarGrid.appendChild(emptyTile);
+    }
+
+    // Days of current month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayTwoDigits = String(day).padStart(2, '0');
+        const monthTwoDigits = String(calCurrentMonth + 1).padStart(2, '0');
+        const dateStr = `${calCurrentYear}-${monthTwoDigits}-${dayTwoDigits}`;
+
+        const tile = document.createElement('div');
+        tile.className = 'calendar-day-tile';
+        if (dateStr === todayStr) tile.classList.add('today');
+
+        // Find cars arriving or picked up on this date
+        const dayCars = cars.filter(c => c.arrivalDate === dateStr || c.pickupDate === dateStr);
+
+        let badgesHtml = '';
+        dayCars.slice(0, 3).forEach(car => {
+            const isArrival = car.arrivalDate === dateStr;
+            const badgeClass = isArrival ? 'arrival' : 'pickup';
+            const prefix = isArrival ? '🟢' : '🔑';
+            const pinnedClass = car.pinnedOnMain ? 'pinned' : '';
+            badgesHtml += `<span class="cal-car-badge ${badgeClass} ${pinnedClass}">${prefix} ${car.brand}</span>`;
+        });
+
+        if (dayCars.length > 3) {
+            badgesHtml += `<span class="cal-car-badge" style="background:rgba(255,255,255,0.1);">+${dayCars.length - 3} aut</span>`;
+        }
+
+        tile.innerHTML = `
+            <div class="day-tile-top">
+                <span class="day-num">${day}</span>
+                ${dayCars.length > 0 ? `<span class="day-cars-count">${dayCars.length}</span>` : ''}
+            </div>
+            <div class="day-badges-container">
+                ${badgesHtml}
             </div>
         `;
-    }).join('') || '<p style="text-align:center; padding: 20px; color: var(--text-muted);">Brak ostatnich aktywności Tomek/Monia</p>';
-}
 
-// Logic to check if 1 day has passed for cars marked as "Gotowe"
-async function processAutoArchiving() {
-    // Auto-archiving removed per user request. 
-    // Manual archiving is now the only way to move cars to archive.
-}
-
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
-        <span class="toast-msg">${message}</span>
-    `;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 500);
-    }, 3000);
-}
-
-// Custom Confirmation Modal Helper
-function showConfirm(message, confirmBtnText = 'OK', cancelBtnText = 'Anuluj', isDanger = false) {
-    return new Promise((resolve) => {
-        confirmMessageEl.textContent = message;
-        confirmOkBtn.textContent = confirmBtnText;
-        confirmCancelBtn.textContent = cancelBtnText;
-
-        if (isDanger) {
-            confirmOkBtn.classList.add('danger');
-        } else {
-            confirmOkBtn.classList.remove('danger');
-        }
-
-        confirmModal.classList.add('active');
-
-        const cleanup = (result) => {
-            confirmModal.classList.remove('active');
-            confirmOkBtn.removeEventListener('click', onOk);
-            confirmCancelBtn.removeEventListener('click', onCancel);
-            resolve(result);
-        };
-
-        const onOk = () => cleanup(true);
-        const onCancel = () => cleanup(false);
-
-        confirmOkBtn.addEventListener('click', onOk);
-        confirmCancelBtn.addEventListener('click', onCancel);
-    });
-}
-
-function applyTheme(theme) {
-    if (theme === 'light') {
-        document.body.classList.remove('dark-theme');
-        document.body.classList.add('light-theme');
-        sunIcon.style.display = 'block';
-        moonIcon.style.display = 'none';
-    } else {
-        document.body.classList.remove('light-theme');
-        document.body.classList.add('dark-theme');
-        sunIcon.style.display = 'none';
-        moonIcon.style.display = 'block';
+        tile.onclick = () => openCalendarDayModal(dateStr, dayCars);
+        calendarGrid.appendChild(tile);
     }
-    localStorage.setItem('ecoCarTheme', theme);
 }
 
-themeToggleBtn.addEventListener('click', () => {
-    const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
-    applyTheme(currentTheme === 'light' ? 'dark' : 'light');
-});
+function openCalendarDayModal(dateStr, dayCars) {
+    selectedCalDate = dateStr;
+    const parts = dateStr.split('-');
+    calDayModalTitle.textContent = `📅 Zarządzanie dla dnia: ${parts[2]}.${parts[1]}.${parts[0]}`;
 
-// Render UI
+    // Populate day cars list
+    if (dayCars.length === 0) {
+        calDayCarsList.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">Brak zaplanowanych aut na ten dzień.</p>';
+    } else {
+        calDayCarsList.innerHTML = dayCars.map(car => `
+            <div class="cal-day-car-item">
+                <div>
+                    <strong>${car.brand}</strong> ${car.plateNum ? `(${car.plateNum})` : ''}
+                    <div style="font-size:0.75rem; color:var(--text-muted);">
+                        Właściciel: ${car.ownerName || '---'} | Status: ${car.status || 'przyjedzie'}
+                    </div>
+                </div>
+                <button class="btn-secondary btn-pin-main" data-id="${car.id}" style="font-size:0.75rem; padding:6px 10px;">
+                    📌 Dodaj do Ekranu Głównym
+                </button>
+            </div>
+        `).join('');
+
+        // Pin to main event listeners
+        calDayCarsList.querySelectorAll('.btn-pin-main').forEach(btn => {
+            btn.onclick = async () => {
+                const cId = btn.dataset.id;
+                try {
+                    await updateDoc(doc(db, 'cars', cId), {
+                        archived: false,
+                        pinnedOnMain: true
+                    });
+                    showToast("Dodano/Przypięto auto do ekranu głównego!", "success");
+                    calDayModal.classList.remove('active');
+                } catch (e) { showToast("Błąd dodawania", "error"); }
+            };
+        });
+    }
+
+    // Populate dropdown with all cars in database
+    calAssignCarSelect.innerHTML = '<option value="">Wybierz auto z bazy...</option>' +
+        cars.map(c => `<option value="${c.id}">${c.brand} (${c.plateNum || 'brak nr'}) - ${c.ownerName || ''}</option>`).join('');
+
+    calDayModal.classList.add('active');
+}
+
+// Render Cars Grid / Archive Rows
 function renderCars(filter = '') {
     const searchTerm = filter.toLowerCase();
 
-    // Filter by view state (active vs archive)
     let filteredCars = cars.filter(car => {
         const isArchive = car.archived;
         if (currentView === 'active') return !isArchive;
         if (currentView === 'archive') {
             if (!isArchive) return false;
-
-            // Period Filter
             if (archivePeriod === 'all') return true;
 
             const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate) : null;
@@ -762,7 +747,7 @@ function renderCars(filter = '') {
         (car.ownerPhone || '').includes(searchTerm) ||
         (car.history || '').toLowerCase().includes(searchTerm) ||
         (car.worker || '').toLowerCase().includes(searchTerm) ||
-        (car.todo || []).some(item => item.toLowerCase().includes(searchTerm))
+        (car.todo || []).some(item => (typeof item === 'string' ? item : item.text).toLowerCase().includes(searchTerm))
     );
 
     if (filteredCars.length === 0) {
@@ -780,14 +765,12 @@ function renderCars(filter = '') {
         renderActiveGrid(filteredCars);
     }
 
-    // Attach event listeners to new buttons
     attachCardListeners();
 }
 
 function renderArchiveRows(filteredCars) {
     const sorted = [...filteredCars].sort((a, b) => new Date(b.statusChangeDate || b.dateAdded) - new Date(a.statusChangeDate || b.dateAdded));
 
-    // Calculate Total for filtered archive
     const totalArchiveValue = filteredCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
     archiveTotalValueEl.parentElement.classList.add('price-blur-target');
@@ -839,36 +822,17 @@ function renderActiveGrid(filteredCars) {
     carsGrid.innerHTML = filteredCars.map(car => generateCarCardHtml(car)).join('');
 }
 
-function updateCountdowns() {
-    document.querySelectorAll('.countdown-timer').forEach(el => {
-        const pickupStr = el.dataset.pickup;
-        if (!pickupStr) return;
-
-        // Assume pick-up is by the end of the day
-        const pickupDate = new Date(pickupStr + 'T23:59:59');
-        const now = new Date();
-        const diff = pickupDate - now;
-
-        if (diff < 0) {
-            el.innerHTML = '<span class="expired">⌛ Czas upłynął!</span>';
-            return;
-        }
-
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-        let timeStr = '';
-        if (days > 0) timeStr += `${days}d `;
-        timeStr += `${hours}h ${minutes}m ${seconds}s`;
-
-        el.innerHTML = `⌛ Pozostało: ${timeStr}`;
-    });
-}
-
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
+    
+    // Normalize todo items into task objects
+    let tasks = [];
+    if (car.todoTasks && Array.isArray(car.todoTasks)) {
+        tasks = car.todoTasks;
+    } else if (car.todo && Array.isArray(car.todo)) {
+        tasks = car.todo.map(t => typeof t === 'string' ? { text: t, done: false } : t);
+    }
+
     return `
         <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
             <div class="dates-row">
@@ -885,7 +849,7 @@ function generateCarCardHtml(car) {
                 <span class="val">${formatCurrency(car.price)}</span>
             </div>
             <div class="car-info-row">
-                <span class="label">Właściciel</span>
+                <span class="label">Właściciel Auta</span>
                 <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
             </div>
             ${car.worker ? `
@@ -899,11 +863,21 @@ function generateCarCardHtml(car) {
                 <span>Dodane przez: <strong style="color: var(--primary-green);">${car.addedBy || 'System'}</strong></span>
             </div>
             
-            ${car.todo && car.todo.length > 0 ? `
+            ${tasks.length > 0 ? `
             <div class="todo-list-preview">
-                <span class="label">Do zrobienia:</span>
-                <ul>
-                    ${car.todo.map(item => `<li><span class="todo-bullet"></span>${item}</li>`).join('')}
+                <span class="label">Zadania Do Zrobienia (Kliknij aby odznaczyć):</span>
+                <ul class="todo-interactive-list">
+                    ${tasks.map((task, idx) => `
+                        <li class="todo-interactive-item ${task.done ? 'done' : ''}" data-car-id="${car.id}" data-idx="${idx}">
+                            <div class="todo-check-box">
+                                <span>${task.done ? '✅' : '⏹️'}</span>
+                                <span>${task.text}</span>
+                            </div>
+                            ${task.done && task.doneBy ? `
+                                <span class="todo-done-info">Wykonane: ${task.doneBy}</span>
+                            ` : ''}
+                        </li>
+                    `).join('')}
                 </ul>
             </div>
             ` : ''}
@@ -924,8 +898,6 @@ function generateCarCardHtml(car) {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
                 ` : ''}
-
-
             </div>
 
             ${!car.archived ? `
@@ -934,13 +906,11 @@ function generateCarCardHtml(car) {
                 <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
                 <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
             </div>
-            ${!car.archived ? `
             <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
                 <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
                     📥 PRZENIEŚ DO ARCHIWUM
                 </button>
             </div>
-            ` : ''}
             ` : ''}
         </div>
     `;
@@ -962,6 +932,70 @@ function attachCardListeners() {
     document.querySelectorAll('.btn-status:not(.btn-archive)').forEach(btn => {
         btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
     });
+
+    // Interactive To-do Item Click Handlers
+    document.querySelectorAll('.todo-interactive-item').forEach(item => {
+        item.onclick = (e) => {
+            e.stopPropagation();
+            const carId = item.dataset.carId;
+            const taskIdx = parseInt(item.dataset.idx, 10);
+            toggleCarTask(carId, taskIdx);
+        };
+    });
+}
+
+// Toggle Task Completion & Send Notification to Owners
+async function toggleCarTask(carId, taskIndex) {
+    const car = cars.find(c => c.id === carId);
+    if (!car) return;
+
+    let tasks = [];
+    if (car.todoTasks && Array.isArray(car.todoTasks)) {
+        tasks = [...car.todoTasks];
+    } else if (car.todo && Array.isArray(car.todo)) {
+        tasks = car.todo.map(t => typeof t === 'string' ? { text: t, done: false } : { ...t });
+    }
+
+    if (!tasks[taskIndex]) return;
+
+    const task = tasks[taskIndex];
+    const newDone = !task.done;
+    task.done = newDone;
+
+    if (newDone) {
+        task.doneBy = currentUser || 'Pracownik';
+        task.doneAt = new Date().toISOString();
+
+        // Create Real-time Notification for Owners
+        try {
+            await addDoc(notificationsCol, {
+                text: `Pracownik ${currentUser || 'Pracownik'} ukończył zadanie "${task.text}" w aucie ${car.brand}${car.plateNum ? ' (' + car.plateNum + ')' : ''}`,
+                carId: car.id,
+                carBrand: car.brand,
+                taskText: task.text,
+                worker: currentUser || 'Pracownik',
+                timestamp: new Date().toISOString(),
+                read: false
+            });
+            logAction(`Pracownik ${currentUser} ukończył zadanie: ${task.text} (${car.brand})`);
+            showToast(`Odznaczono zadanie: "${task.text}" jako wykonane!`, "success");
+        } catch (e) {
+            console.error("Notif error", e);
+        }
+    } else {
+        delete task.doneBy;
+        delete task.doneAt;
+        showToast(`Cofnięto wykonanie zadania "${task.text}".`, "info");
+    }
+
+    try {
+        await updateDoc(doc(db, 'cars', carId), {
+            todoTasks: tasks,
+            todo: tasks.map(t => t.text) // Keep string array todo synced
+        });
+    } catch (e) {
+        showToast("Błąd aktualizacji zadania", "error");
+    }
 }
 
 async function archiveCar(id) {
@@ -990,8 +1024,7 @@ async function archiveCar(id) {
 async function updateCarStatus(id, newStatus) {
     try {
         const car = cars.find(c => c.id === id);
-        const carRef = doc(db, 'cars', id);
-        await updateDoc(carRef, {
+        await updateDoc(doc(db, 'cars', id), {
             status: newStatus,
             statusChangeDate: new Date().toISOString()
         });
@@ -1002,34 +1035,59 @@ async function updateCarStatus(id, newStatus) {
     }
 }
 
+function updateCountdowns() {
+    document.querySelectorAll('.countdown-timer').forEach(el => {
+        const pickupStr = el.dataset.pickup;
+        if (!pickupStr) return;
+
+        const pickupDate = new Date(pickupStr + 'T23:59:59');
+        const now = new Date();
+        const diff = pickupDate - now;
+
+        if (diff < 0) {
+            el.innerHTML = '<span class="expired">⌛ Czas upłynął!</span>';
+            return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let timeStr = '';
+        if (days > 0) timeStr += `${days}d `;
+        timeStr += `${hours}h ${minutes}m ${seconds}s`;
+
+        el.innerHTML = `⌛ Pozostało: ${timeStr}`;
+    });
+}
+
 function updateStats() {
     const activeCars = cars.filter(c => !c.archived);
     totalCarsEl.textContent = activeCars.length;
     const totalValue = activeCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     totalValueEl.textContent = formatCurrency(totalValue);
 
-    // Additional classes for blur targeting
     totalValueEl.parentElement.classList.add('price-blur-target');
     archiveTotalValueEl.parentElement.classList.add('price-blur-target');
 
-    // Update label in stats too if needed
     const valLabel = document.querySelector('.stats-overview .stat-card:last-child .label');
     if (valLabel) valLabel.textContent = 'Aktywna Wartość Usług';
 }
 
-// Helpers
 function formatCurrency(val) {
     return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(val);
 }
 
-// Actions
+// Modal Actions & Triggers
 addCarBtn.addEventListener('click', () => {
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
     document.getElementById('car-id').value = '';
-    // Clear checkboxes explicitly
     document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
     document.getElementById('car-priority').checked = false;
+    customTodos = [];
+    renderCustomTodosInForm();
     carModal.classList.add('active');
 });
 
@@ -1042,6 +1100,9 @@ window.onclick = (event) => {
     if (event.target === helpModal) helpModal.classList.remove('active');
     if (event.target === confirmModal) confirmModal.classList.remove('active');
     if (event.target === reportModal) reportModal.classList.remove('active');
+    if (event.target === notifModal) notifModal.classList.remove('active');
+    if (event.target === calDayModal) calDayModal.classList.remove('active');
+    if (event.target === pwaModal) pwaModal.classList.remove('active');
 };
 
 if (closeReportModalBtn) {
@@ -1069,12 +1130,33 @@ logoutBtn.addEventListener('click', () => {
     showToast("Wylogowano pomyślnie", "info");
 });
 
+function renderCustomTodosInForm() {
+    if (!customTodosList) return;
+    customTodosList.innerHTML = customTodos.map((t, idx) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; font-size:0.85rem;">
+            <span>➕ ${t.text}</span>
+            <button type="button" class="btn-remove-custom-todo" data-idx="${idx}" style="background:none; border:none; color:#ff4b2b; cursor:pointer;">&times;</button>
+        </div>
+    `).join('');
+
+    customTodosList.querySelectorAll('.btn-remove-custom-todo').forEach(btn => {
+        btn.onclick = () => {
+            const i = parseInt(btn.dataset.idx, 10);
+            customTodos.splice(i, 1);
+            renderCustomTodosInForm();
+        };
+    });
+}
+
 carForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const id = document.getElementById('car-id').value;
     const todoCheckboxes = document.querySelectorAll('input[name="todo"]:checked');
-    const todoList = Array.from(todoCheckboxes).map(cb => cb.value);
+    const checkedTodos = Array.from(todoCheckboxes).map(cb => ({ text: cb.value, done: false }));
+    
+    // Merge predefined checked todos and custom added todos
+    const combinedTodos = [...checkedTodos, ...customTodos];
 
     const carData = {
         brand: document.getElementById('car-brand').value,
@@ -1086,7 +1168,8 @@ carForm.addEventListener('submit', async (e) => {
         worker: document.getElementById('car-worker').value,
         arrivalDate: document.getElementById('car-arrival-date').value,
         pickupDate: document.getElementById('car-pickup-date').value,
-        todo: todoList,
+        todoTasks: combinedTodos,
+        todo: combinedTodos.map(t => t.text),
         priority: document.getElementById('car-priority').checked,
         archived: id ? (cars.find(c => c.id === id).archived || false) : false,
         status: id ? (cars.find(c => c.id === id).status || 'przyjedzie') : 'przyjedzie',
@@ -1097,7 +1180,7 @@ carForm.addEventListener('submit', async (e) => {
     try {
         if (id) {
             await updateDoc(doc(db, 'cars', id), carData);
-            showToast("Zaktualizowano dane", "success");
+            showToast("Zaktualizowano dane auta", "success");
             logAction(`Edytowano auto: ${carData.brand}`);
         } else {
             await addDoc(carsCol, carData);
@@ -1139,16 +1222,21 @@ function editCar(id) {
         document.getElementById('car-price').value = car.price;
         document.getElementById('car-owner-name').value = car.ownerName || '';
         document.getElementById('car-owner-phone').value = car.ownerPhone;
-        document.getElementById('car-history').value = car.history;
+        document.getElementById('car-history').value = car.history || '';
         document.getElementById('car-worker').value = car.worker || '';
         document.getElementById('car-arrival-date').value = car.arrivalDate || '';
         document.getElementById('car-pickup-date').value = car.pickupDate || '';
         document.getElementById('car-priority').checked = car.priority || false;
 
         // Reset and set checkboxes
+        const carTodoTexts = (car.todoTasks ? car.todoTasks.map(t => t.text) : (car.todo || []));
         document.querySelectorAll('input[name="todo"]').forEach(cb => {
-            cb.checked = (car.todo || []).includes(cb.value);
+            cb.checked = carTodoTexts.includes(cb.value);
         });
+
+        // Custom todos
+        customTodos = (car.todoTasks || []).filter(t => !['Konserwacja podwozia', 'Ceramika', 'Czyszczenie środka', 'Korekta lakieru', 'Pranie tapicerki'].includes(t.text));
+        renderCustomTodosInForm();
 
         carModal.classList.add('active');
     }
@@ -1160,355 +1248,201 @@ function openReportModal(id) {
         return;
     }
 
-    const car = cars.find(c => c.id === id);
-    if (!car) return;
-    document.getElementById('report-car-id').value = id;
+    reportCarIdInput.value = id;
     reportForm.reset();
-
-    // Check if Ceramika in todo
-    const hasCeramic = (car.todo || []).some(item => item.toLowerCase().includes('ceramika'));
-    const ceramicGroup = document.getElementById('ceramic-options-group');
-    if (hasCeramic) {
-        ceramicGroup.style.display = 'block';
-    } else {
-        ceramicGroup.style.display = 'none';
-        document.getElementById('report-ceramic').value = 'Brak (Inna)';
-    }
-
     reportModal.classList.add('active');
 }
 
-document.getElementById('btn-generate-ai').addEventListener('click', () => {
-    const keywords = document.getElementById('report-keywords').value.trim();
-    if (!keywords) {
-        showToast("Wpisz najpierw słowa kluczowe!", "info");
-        return;
-    }
+async function loadAdminData() {
+    const updateStatusCard = async (userId, cardId) => {
+        const docRef = doc(db, 'settings', userId + '_login');
+        const d = await getDoc(docRef);
+        const card = document.getElementById(cardId);
+        if (!card) return;
 
-    const id = document.getElementById('report-car-id').value;
-    const car = cars.find(c => c.id === id);
-    if (!car) return;
+        const timeEl = card.querySelector('.time');
+        const statusEl = card.querySelector('.status-indicator span');
 
-    const ceramic = document.getElementById('report-ceramic').value;
-    let ceramicText = '';
-    if (ceramic && ceramic !== 'Brak (Inna)') {
-        ceramicText = ` W celu długotrwałego zabezpieczenia lakieru i nadania mu unikalnego blasku, zaaplikowano wysokiej klasy powłokę ceramiczną marki ${ceramic}. Zapewni to długoterminową odporność i łatwość pielęgnacji przez wiele lat.`;
-    }
+        if (d.exists()) {
+            const lastLogin = new Date(d.data().lastLogin);
+            timeEl.textContent = lastLogin.toLocaleString('pl-PL');
 
-    const sentences = [
-        `W pojeździe marki ${car.brand} wykonano serię zaawansowanych usług z zakresu profesjonalnego Auto Detailingu.`,
-        `Główne czynności obejmowały: ${keywords.toLowerCase()}.`,
-        `Wszelkie prace zostały przeprowadzone z użyciem profesjonalnych i w pełni bezpiecznych środków najwyższej jakości.`,
-        `${ceramicText}`,
-        `Przeprowadzone zabiegi w kluczowy sposób poprawiły wizualny i fizyczny stan pojazdu, skutecznie podnosząc jego walory estetyczne i ułatwiając bieżące utrzymanie perfekcyjnego stanu.`
-    ];
-
-    document.getElementById('report-notes').value = sentences.join(' ');
-    showToast("Pomyślnie wygenerowano opis dzięki słowom kluczowym!", "success");
-});
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
-
-reportForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('report-car-id').value;
-    const car = cars.find(c => c.id === id);
-    if (!car) return;
-
-    const extraHours = document.getElementById('report-hours').value;
-    const ceramicBrand = document.getElementById('report-ceramic') ? document.getElementById('report-ceramic').value : 'Brak (Inna)';
-    const notes = document.getElementById('report-notes').value;
-
-    const beforeFiles = document.getElementById('report-photos-before').files;
-    const afterFiles = document.getElementById('report-photos-after').files;
-
-    let template = document.createElement('div');
-    template.style.padding = '30pt';
-    template.style.width = '800px';
-    template.style.fontFamily = 'Outfit, sans-serif';
-    template.style.color = '#000';
-    template.style.backgroundColor = '#fff';
-    template.style.fontSize = '12pt';
-    template.style.lineHeight = '1.6';
-
-    const renderPhotos = async (files, label) => {
-        let photosHtml = '<div style="text-align: center; margin-bottom: 15pt;">';
-        let count = 1;
-        for (let file of files) {
-            const base64 = await fileToBase64(file);
-            photosHtml += `
-                <div style="display: inline-block; width: 48%; margin: 0 0.5% 15pt; vertical-align: top; page-break-inside: avoid; text-align: center;">
-                    <img src="${base64}" style="width: 100%; max-height: 250pt; object-fit: contain; border-radius: 4pt; border: 1px solid #ddd; padding: 2pt;">
-                    <p style="margin: 5pt 0 0; font-size: 10pt; color: #555; font-weight: bold;">${label} ${count}</p>
-                </div>
-            `;
-            count++;
-        }
-        photosHtml += '</div>';
-        return photosHtml;
-    };
-
-    const beforePhotosHtml = beforeFiles.length > 0 ? await renderPhotos(beforeFiles, 'Stan PRZED - Zdjęcie') : '<p>Brak zdjęć dołączonych do raportu</p>';
-    const afterPhotosHtml = afterFiles.length > 0 ? await renderPhotos(afterFiles, 'Efekt PO - Zdjęcie') : '<p>Brak zdjęć po dołączonych do raportu</p>';
-
-    const todoList = (car.todo && car.todo.length > 0) ? `<ul style="margin:0; padding-left:20pt;">${car.todo.map(t => `<li>${t}</li>`).join('')}</ul>` : '<p>Brak dedykowanej listy zadań.</p>';
-
-    template.innerHTML = `
-        <div style="font-family: inherit;">
-            <h1 style="text-align: center; color: #10b981; margin-bottom: 5pt; font-size: 24pt;">Raport Serwisu Auto Detalingu</h1>
-            <p style="text-align: center; color: #666; font-size: 10pt; margin-bottom: 25pt;">Wystawiono dla: ${car.ownerName || '---'} | Kontakt: ${car.ownerPhone}</p>
-            
-            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">1. Dane Pojazdu i Zlecenia</h2>
-                <div style="display:flex; justify-content:space-between; width: 100%;">
-                    <p style="margin: 2pt 0; width:50%;"><strong>Pojazd:</strong> ${car.brand}</p>
-                    <p style="margin: 2pt 0; width:50%;"><strong>Data Wydania:</strong> ${car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : new Date().toLocaleDateString('pl-PL')}</p>
-                </div>
-                <div style="display:flex; justify-content:space-between; width: 100%;">
-                    <p style="margin: 2pt 0; width:50%;"><strong>Tablice:</strong> ${car.plateNum || '---'}</p>
-                </div>
-            </div>
-
-            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">2. Wykonane Czynności</h2>
-                ${todoList}
-                ${ceramicBrand && ceramicBrand !== 'Brak (Inna)' ? `<p style="margin-top: 8pt;"><strong>Zaaplikowana Powłoka Ceramiczna:</strong> ${ceramicBrand}</p>` : ''}
-                ${extraHours ? `<p style="margin-top: 8pt;"><strong>Czas Trwania Usługi (Godzin):</strong> ${extraHours} h</p>` : ''}
-            </div>
-
-            <div style="margin-bottom: 20pt; border-bottom: 1pt solid #10b981; padding-bottom: 10pt;">
-                <h2 style="font-size: 14pt; margin-bottom: 8pt; color: #333;">3. Podsumowanie i Opis Usługi</h2>
-                <p style="margin: 0; white-space: pre-wrap; line-height: 1.5;">${notes || '---'}</p>
-            </div>
-
-            <div style="margin-bottom: 20pt; clear: both;">
-                <h2 style="font-size: 14pt; margin-bottom: 12pt; color: #333; page-break-after: avoid;">4. Dodatkowe Informacje / Zdjęcia Przed</h2>
-                ${beforePhotosHtml}
-            </div>
-
-            <div style="margin-bottom: 20pt; clear: both;">
-                <h2 style="font-size: 14pt; margin-bottom: 12pt; color: #333; page-break-after: avoid;">5. Dokumentacja Końcowa / Zdjęcia Po</h2>
-                ${afterPhotosHtml}
-            </div>
-
-            <div style="margin-top: 50pt; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid;">
-                <div style="text-align: center; border-top: 1pt solid #333; padding-top: 5pt; width: 200pt;">
-                    <p style="margin: 0; font-size: 10pt; color: #333;">Podpis Wykonawcy (EcoCarPro)</p>
-                </div>
-                <div style="text-align: center; border-top: 1pt solid #333; padding-top: 5pt; width: 200pt;">
-                    <p style="margin: 0; font-size: 10pt; color: #333;">Podpis Właściciela Pojazdu</p>
-                </div>
-            </div>
-        </div>
-    `;
-
-    var opt = {
-        margin: [30, 30, 30, 30],
-        filename: `Raport_EcoCarPro_${car.brand.replace(/\s+/g, '_')}_${car.plateNum || ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['h2', 'h1', '.avoid-break', 'img', 'div[style*="page-break-inside: avoid"]'] }
-    };
-
-    showToast("Generowanie układu i zapisywanie PDF...", "info");
-
-    try {
-        await html2pdf().set(opt).from(template).save();
-        showToast("Pomyślnie wygenerowano PDF", "success");
-        reportModal.classList.remove('active');
-    } catch (err) {
-        showToast("Nie udało się pobrać PDF.", "error");
-    }
-});
-
-searchInput.addEventListener('input', (e) => {
-    renderCars(e.target.value);
-});
-
-
-
-// Database-backed user config helpers
-async function getUserConfig(username) {
-    const docRef = doc(db, 'settings', username.toLowerCase() + '_config');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-        return snap.data();
-    } else {
-        const defaultPasswords = {
-            'admin': 'system02',
-            'tomek': 'tommar',
-            'monia': 'wanda'
-        };
-        const initialConfig = {
-            password: defaultPasswords[username.toLowerCase()] || 'eco123',
-            isLocked: false,
-            failedAttempts: 0
-        };
-        await setDoc(docRef, initialConfig);
-        return initialConfig;
-    }
-}
-
-async function updateUserConfig(username, updates) {
-    const docRef = doc(db, 'settings', username.toLowerCase() + '_config');
-    await updateDoc(docRef, updates);
-}
-
-// Calendar rendering helpers
-function renderCalendar() {
-    calendarMonthsRow.innerHTML = "";
-    
-    const plMonths = [
-        "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", 
-        "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
-    ];
-
-    const today = new Date();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
-    const todayDay = today.getDate();
-
-    for (let m = 0; m < 12; m++) {
-        const col = document.createElement('div');
-        col.className = 'month-column';
-        
-        const header = document.createElement('h4');
-        header.textContent = plMonths[m];
-        col.appendChild(header);
-
-        const daysList = document.createElement('div');
-        daysList.className = 'days-list';
-
-        const daysInMonth = new Date(selectedYear, m + 1, 0).getDate();
-
-        for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = `${selectedYear}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            
-            const dayCell = document.createElement('div');
-            dayCell.className = 'day-cell';
-            dayCell.dataset.date = dateStr;
-            dayCell.innerHTML = `<span>${d}</span>`;
-
-            if (selectedYear === todayYear && m === todayMonth && d === todayDay) {
-                dayCell.classList.add('today-cell');
-            }
-
-            if (dateStr === selectedDateStr) {
-                dayCell.classList.add('selected-day');
-            }
-
-            const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
-            if (dayEvents.length > 0) {
-                const indicatorBox = document.createElement('div');
-                indicatorBox.className = 'day-indicator-box';
-                indicatorBox.innerHTML = `
-                    <span class="event-dot" style="${currentUser === 'Monia' ? 'background-color:#ec4899; box-shadow:0 0 8px #ec4899;' : ''}"></span>
-                    <span class="event-count-badge" style="${currentUser === 'Monia' ? 'background:rgba(236,72,153,0.2); color:#ec4899;' : ''}">${dayEvents.length}</span>
-                `;
-                dayCell.appendChild(indicatorBox);
-            }
-
-            dayCell.onclick = () => {
-                document.querySelectorAll('.day-cell.selected-day').forEach(el => el.classList.remove('selected-day'));
-                dayCell.classList.add('selected-day');
-                
-                selectedDateStr = dateStr;
-                openTimelineForDay(dateStr);
-            };
-
-            daysList.appendChild(dayCell);
-        }
-
-        col.appendChild(daysList);
-        calendarMonthsRow.appendChild(col);
-    }
-}
-
-function openTimelineForDay(dateStr) {
-    const d = new Date(dateStr);
-    const options = { day: 'numeric', month: 'long', year: 'numeric' };
-    const formattedDate = d.toLocaleDateString('pl-PL', options);
-    
-    selectedDayLabel.textContent = formattedDate;
-    timelineAddForm.style.display = 'block';
-
-    const activeCars = cars.filter(c => !c.archived);
-    assignCarSelect.innerHTML = '<option value="">Wybierz pojazd...</option>' + 
-        activeCars.map(c => `<option value="${c.id}">${c.brand} [${c.plateNum || 'brak tablic'}]</option>`).join('');
-
-    renderTimeline(dateStr);
-}
-
-function renderTimeline(dateStr) {
-    const dayEvents = calendarEvents.filter(ev => ev.date === dateStr);
-    
-    dayEvents.sort((a, b) => {
-        if (a.time && b.time) return a.time.localeCompare(b.time);
-        if (a.time) return -1;
-        if (b.time) return 1;
-        return new Date(a.timestamp) - new Date(b.timestamp);
-    });
-
-    if (dayEvents.length === 0) {
-        timelineEventsEl.innerHTML = '<p class="select-day-prompt">Brak zaplanowanych pojazdów na ten dzień. Dodaj auto poniżej!</p>';
-        return;
-    }
-
-    timelineEventsEl.innerHTML = dayEvents.map(ev => {
-        let label = "";
-        let typeBadge = "";
-        
-        if (ev.carId) {
-            const car = cars.find(c => c.id === ev.carId);
-            if (car) {
-                label = `${car.brand} 📌 <strong>${car.plateNum || 'brak tablic'}</strong> (Klient: ${car.ownerName || '---'})`;
-                typeBadge = "z panelu";
+            const diff = new Date() - lastLogin;
+            if (diff < 300000) {
+                statusEl.textContent = 'Online';
+                statusEl.className = 'online';
             } else {
-                label = `Pojazd usunięty z bazy (ID: ${ev.carId})`;
-                typeBadge = "nieznany";
+                statusEl.textContent = 'Offline';
+                statusEl.className = 'offline';
             }
-        } else {
-            label = ev.customText || "";
-            typeBadge = "ręczny";
         }
 
-        const timeDisplay = ev.time ? `<span class="timeline-time-badge" style="${currentUser === 'Monia' ? 'background:rgba(236,72,153,0.15); color:#ec4899;' : ''}">${ev.time}</span>` : `<span class="timeline-time-badge">--:--</span>`;
+        const lockRef = doc(db, 'settings', userId + '_lock');
+        const lockSnap = await getDoc(lockRef);
+        const isLocked = lockSnap.exists() && lockSnap.data().locked;
 
-        return `
-            <div class="timeline-item" style="${currentUser === 'Monia' ? 'border-left-color:#ec4899;' : ''}">
-                ${timeDisplay}
-                <div class="timeline-item-title">${label}</div>
-                <span class="timeline-item-type">${typeBadge}</span>
-                <button type="button" class="btn-icon btn-delete-event" data-id="${ev.id}" title="Usuń z osi czasu" style="padding: 4px 8px; color: #ef4444; border-color: rgba(239, 68, 68, 0.2); background: transparent;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-            </div>
-        `;
-    }).join('');
+        const existingBtn = card.querySelector('.unlock-btn');
+        if (existingBtn) existingBtn.remove();
 
-    document.querySelectorAll('.btn-delete-event').forEach(btn => {
-        btn.onclick = async () => {
-            const evId = btn.dataset.id;
-            const confirmed = await showConfirm("Czy na pewno chcesz usunąć to auto z osi czasu?", "USUŃ", "ANULUJ", true);
-            if (confirmed) {
-                try {
-                    await deleteDoc(doc(db, 'calendar_events', evId));
-                    showToast("Usunięto przypisanie z kalendarza", "success");
-                    logAction(`Usunięto pojazd z kalendarza dla dnia ${dateStr}`);
-                } catch (e) {
-                    showToast("Błąd podczas usuwania", "error");
+        const actionBtn = document.createElement('button');
+        actionBtn.className = isLocked ? 'unlock-btn' : 'unlock-btn suspend-btn';
+        if (!isLocked) {
+            actionBtn.style.background = '#f59e0b';
+        }
+        actionBtn.textContent = isLocked ? 'Odblokuj Konto' : 'Zawieś Konto';
+
+        actionBtn.onclick = async () => {
+            if (isLocked) {
+                await setDoc(lockRef, { locked: false, suspended: false });
+                showToast(`Odblokowano użytkownika ${userId}`, "success");
+            } else {
+                const confirmed = await showConfirm(`Czy na pewno chcesz zawiesić konto użytkownika ${userId}?`, 'ZAWIEŚ', 'ANULUJ', true);
+                if (confirmed) {
+                    await setDoc(lockRef, { locked: true, suspended: true, timestamp: new Date().toISOString() });
+                    showToast(`Zawieszono użytkownika ${userId}`, "error");
                 }
             }
+            loadAdminData();
         };
+        card.querySelector('.user-info').appendChild(actionBtn);
+
+        const validUsers = {
+            'admin': 'system02',
+            'tomek': 'tommar',
+            'monia': 'wanda',
+            'adam': '767211439',
+            'michal': '192837465',
+            'lukasz': '564738291',
+            'nastka': '908172635'
+        };
+
+        const pass = validUsers[userId];
+        if (pass) {
+            const existingPass = card.querySelector('.pass-preview');
+            if (existingPass) existingPass.remove();
+
+            const passContainer = document.createElement('div');
+            passContainer.className = 'pass-preview';
+            passContainer.style.fontSize = '0.75rem';
+            passContainer.style.marginTop = '10px';
+            passContainer.style.padding = '4px 8px';
+            passContainer.style.background = 'rgba(255,255,255,0.05)';
+            passContainer.style.borderRadius = '6px';
+            passContainer.style.color = 'var(--text-muted)';
+
+            const maskedPass = '●'.repeat(pass.length);
+            passContainer.innerHTML = `🔐 <span class="pass-val" data-real="${pass}">${maskedPass}</span> <button class="btn-show-pass" style="background:none; border:none; color:var(--primary-green); cursor:pointer; font-size:0.7rem; font-weight:bold; margin-left:5px;">POKAŻ</button>`;
+
+            passContainer.querySelector('.btn-show-pass').onclick = (e) => {
+                const valEl = passContainer.querySelector('.pass-val');
+                const isMasked = valEl.textContent.includes('●');
+                valEl.textContent = isMasked ? valEl.dataset.real : '●'.repeat(pass.length);
+                e.target.textContent = isMasked ? 'UKRYJ' : 'POKAŻ';
+            };
+
+            card.querySelector('.user-info').appendChild(passContainer);
+        }
+    };
+
+    const userIds = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
+    for (const userId of userIds) {
+        await updateStatusCard(userId, 'status-' + userId);
+    }
+
+    const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
+    const logsSnap = await getDocs(logsQ);
+
+    logsList.innerHTML = logsSnap.docs.map(doc => {
+        const log = doc.data();
+        const date = new Date(log.timestamp);
+        const userColor = log.user === 'Monia' ? '#ec4899' : (log.user === 'Tomek' ? '#10b981' : '#3b82f6');
+        return `
+            <div class="log-item" style="border-left-color: ${userColor}">
+                <div class="log-content">
+                    <strong style="color: ${userColor}">${log.user}:</strong> 
+                    <span>${log.text}</span>
+                </div>
+                <span class="log-date">${date.toLocaleString('pl-PL')}</span>
+            </div>
+        `;
+    }).join('') || '<p style="text-align:center; padding: 20px; color: var(--text-muted);">Brak aktywności</p>';
+}
+
+function processAutoArchiving() {
+    // Manual archiving only
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+        <span class="toast-msg">${message}</span>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 3200);
+}
+
+function showConfirm(message, confirmBtnText = 'OK', cancelBtnText = 'Anuluj', isDanger = false) {
+    return new Promise((resolve) => {
+        confirmMessageEl.textContent = message;
+        confirmOkBtn.textContent = confirmBtnText;
+        confirmCancelBtn.textContent = cancelBtnText;
+
+        if (isDanger) {
+            confirmOkBtn.classList.add('danger');
+        } else {
+            confirmOkBtn.classList.remove('danger');
+        }
+
+        confirmModal.classList.add('active');
+
+        const cleanup = (result) => {
+            confirmModal.classList.remove('active');
+            confirmOkBtn.removeEventListener('click', onOk);
+            confirmCancelBtn.removeEventListener('click', onCancel);
+            resolve(result);
+        };
+
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+
+        confirmOkBtn.addEventListener('click', onOk);
+        confirmCancelBtn.addEventListener('click', onCancel);
     });
 }
 
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.body.classList.remove('dark-theme');
+        document.body.classList.add('light-theme');
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+    } else {
+        document.body.classList.remove('light-theme');
+        document.body.classList.add('dark-theme');
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+    }
+    localStorage.setItem('ecoCarTheme', theme);
+}
+
+if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+        applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+    });
+}
+
+if (searchInput) {
+    searchInput.addEventListener('input', () => renderCars(searchInput.value));
+}
+
+// Start app
 init();
