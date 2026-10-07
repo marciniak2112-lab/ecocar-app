@@ -1824,8 +1824,8 @@ function updateCountdowns() {
         const pickupStr = el.dataset.pickup;
         if (!pickupStr) return;
 
-        const timeStr = el.dataset.time && el.dataset.time.trim() !== '' ? (el.dataset.time.length === 5 ? el.dataset.time + ':00' : el.dataset.time) : '23:59:59';
-        const pickupDate = new Date(`${pickupStr}T${timeStr}`);
+        const targetTimeStr = el.dataset.time && el.dataset.time.trim() !== '' ? (el.dataset.time.length === 5 ? el.dataset.time + ':00' : el.dataset.time) : '23:59:59';
+        const pickupDate = new Date(`${pickupStr}T${targetTimeStr}`);
         const now = new Date();
         const diff = pickupDate - now;
 
