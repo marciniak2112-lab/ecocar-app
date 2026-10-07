@@ -48,7 +48,7 @@ let trashSchedule = [];
 let customUsers = [];
 let deletedUsers = [];
 let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'archive', 'admin'
-let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Michał', 'Łukasz', 'Nastka'
+let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
 
 // Calendar State
@@ -81,7 +81,6 @@ const DEFAULT_PASSWORDS = {
     'tomek': 'tommar',
     'monia': 'wanda',
     'adam': '767211439',
-    'michal': '192837465',
     'lukasz': '564738291',
     'nastka': '908172635'
 };
@@ -89,7 +88,7 @@ const DEFAULT_PASSWORDS = {
 // Helper: Get Password from Firestore settings collection or fallback
 async function getUserPassword(username) {
     const canonical = getCanonicalUsername(username);
-    if (!canonical) return null;
+    if (!canonical || canonical === 'michal') return null;
     if (deletedUsers.includes(canonical)) {
         return null; // Account deleted, acts as if it never existed!
     }
@@ -146,6 +145,8 @@ async function deleteAccount(userId, userName) {
             } else {
                 loadAdminData();
                 populateWorkerSelects();
+                populateNoteWorkerSelect();
+                renderTrashSchedule();
             }
             return true;
         } catch (err) {
@@ -383,6 +384,8 @@ function init() {
         customUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         populateWorkerSelects();
         populateNoteWorkerSelect();
+        renderTrashSchedule();
+        loadAdminData();
     });
 
     // Notes Realtime Listener
@@ -546,7 +549,6 @@ function setupLogin() {
             } catch (e) { console.error("Unlock reset error", e); }
 
             currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
-            if (canonicalUser === 'michal') currentUser = 'Michał';
             if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
 
             localStorage.setItem('ecoCarUser', currentUser);
@@ -712,9 +714,22 @@ function getCarWorkerDisplay(car) {
 
 function getAllWorkerNames() {
     const defaultWorkers = ['Adam', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
-    const customUserNames = customUsers.map(u => u.username);
+    const customUserNames = customUsers.map(u => u.username || u.name).filter(Boolean);
     return Array.from(new Set([...defaultWorkers, ...customUserNames]))
-        .filter(w => w && !deletedUsers.includes(w.toLowerCase()));
+        .filter(w => {
+            const can = w.toLowerCase().trim();
+            return can !== 'michal' && can !== 'michał' && !deletedUsers.includes(can);
+        });
+}
+
+function getTrashWorkerNames() {
+    const baseWorkers = ['Adam', 'Łukasz', 'Nastka'];
+    const customUserNames = customUsers.map(u => u.username || u.name).filter(Boolean);
+    const combined = Array.from(new Set([...baseWorkers, ...customUserNames]));
+    return combined.filter(w => {
+        const can = w.toLowerCase().trim();
+        return can !== 'michal' && can !== 'michał' && !deletedUsers.includes(can);
+    });
 }
 
 function populateWorkerSelects() {
@@ -960,6 +975,7 @@ function setupCalendarNav() {
             calDayModal.classList.remove('active');
             modalTitle.textContent = `Dodaj Auto na Dzień: ${selectedCalDate}`;
             carForm.reset();
+            populateWorkerSelects();
             document.getElementById('car-id').value = '';
             document.getElementById('car-arrival-date').value = selectedCalDate || '';
             document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
@@ -1613,7 +1629,28 @@ function renderTrashSchedule() {
     const randomizeBtn = document.getElementById('btn-randomize-trash');
     if (randomizeBtn) randomizeBtn.style.display = isManager ? 'block' : 'none';
 
-    const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka'];
+    const activeTrashWorkers = getTrashWorkerNames();
+    const availableWorkers = activeTrashWorkers.length > 0 ? activeTrashWorkers : ['Adam', 'Łukasz', 'Nastka'];
+
+    // Sanitize any existing schedule entry that mentions Michał or deleted users
+    let sanitized = false;
+    if (trashSchedule && trashSchedule.length > 0) {
+        trashSchedule.forEach(item => {
+            if (item.worker && (item.worker.toLowerCase() === 'michal' || item.worker.toLowerCase() === 'michał' || deletedUsers.includes(item.worker.toLowerCase()))) {
+                item.worker = availableWorkers[Math.floor(Math.random() * availableWorkers.length)];
+                sanitized = true;
+            }
+        });
+        if (sanitized) {
+            try {
+                setDoc(doc(db, 'settings', 'trash_schedule_doc'), {
+                    schedule: trashSchedule,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: 'System'
+                });
+            } catch (e) { console.error("Trash sanitize update error", e); }
+        }
+    }
 
     if (trashSchedule.length === 0) {
         const now = new Date();
@@ -1622,7 +1659,7 @@ function renderTrashSchedule() {
             const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
             return {
                 weekIndex: i,
-                worker: defaultWorkers[i % defaultWorkers.length],
+                worker: availableWorkers[i % availableWorkers.length],
                 startDate: startDate.toISOString().split('T')[0],
                 endDate: endDate.toISOString().split('T')[0]
             };
@@ -1653,7 +1690,9 @@ function renderTrashSchedule() {
         randomizeBtn.onclick = async () => {
             const confirmed = await showConfirm("Czy chcesz wylosować nowy grafik wywozu śmieci na najbliższe 4 tygodnie?", "LOSUJ", "ANULUJ", false);
             if (confirmed) {
-                const shuffled = [...defaultWorkers].sort(() => Math.random() - 0.5);
+                const freshWorkers = getTrashWorkerNames();
+                const pool = freshWorkers.length > 0 ? freshWorkers : ['Adam', 'Łukasz', 'Nastka'];
+                const shuffled = [...pool].sort(() => Math.random() - 0.5);
                 const now = new Date();
                 const newSchedule = [0, 1, 2, 3].map(i => {
                     const startDate = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
@@ -1721,6 +1760,8 @@ function setupAccountCreation() {
             logAction(`${currentUser} stworzył konto użytkownika: ${username}`);
             form.reset();
             populateWorkerSelects();
+            populateNoteWorkerSelect();
+            renderTrashSchedule();
             loadAdminData();
         } catch (err) {
             showToast("Błąd tworzenia konta", "error");
@@ -1872,6 +1913,7 @@ addCarBtn.addEventListener('click', () => {
     }
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
+    populateWorkerSelects();
     document.getElementById('car-id').value = '';
     document.getElementById('car-service-name').value = '';
     document.getElementById('car-visit-type').value = 'usluga';
@@ -2062,7 +2104,8 @@ function editCar(id) {
         document.getElementById('car-visit-type').value = car.visitType || 'usluga';
         document.getElementById('car-priority').checked = car.priority || false;
 
-        // Check assigned worker checkboxes
+        // Populate and check assigned worker checkboxes
+        populateWorkerSelects();
         const assignedWorkers = car.workers || (car.worker ? car.worker.split(',').map(s => s.trim()) : []);
         document.querySelectorAll('input[name="car-worker-cb"]').forEach(cb => {
             cb.checked = assignedWorkers.includes(cb.value);
@@ -2481,8 +2524,8 @@ async function loadAdminData() {
         { id: 'admin', name: 'Admin', role: 'Właściciel / System' },
         { id: 'tomek', name: 'Tomek', role: 'Właściciel' },
         { id: 'monia', name: 'Monia', role: 'Właściciel' },
+        { id: 'lukasz', name: 'Łukasz', role: 'Kierownik' },
         { id: 'adam', name: 'Adam', role: 'Pracownik' },
-        { id: 'lukasz', name: 'Łukasz', role: 'Pracownik' },
         { id: 'nastka', name: 'Nastka', role: 'Pracownik' }
     ];
 
@@ -2490,6 +2533,7 @@ async function loadAdminData() {
     defaultUsersList.forEach(u => allUsersMap.set(u.id, u));
     customUsers.forEach(u => {
         const canonical = (u.username || u.id).toLowerCase();
+        if (canonical === 'michal') return;
         if (!allUsersMap.has(canonical)) {
             allUsersMap.set(canonical, {
                 id: canonical,
@@ -2500,7 +2544,10 @@ async function loadAdminData() {
         }
     });
 
-    const activeUsers = Array.from(allUsersMap.values()).filter(u => !deletedUsers.includes(u.id.toLowerCase()));
+    const activeUsers = Array.from(allUsersMap.values()).filter(u => {
+        const can = u.id.toLowerCase();
+        return can !== 'michal' && !deletedUsers.includes(can);
+    });
 
     if (activeUsers.length === 0) {
         usersStatusGrid.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:1.5rem; grid-column:1/-1;">Brak aktywnych kont w systemie.</p>';
