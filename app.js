@@ -687,6 +687,19 @@ function updateUIForRole() {
         }
     }
 
+    // Calendar access: Only Owners (Admin, Tomek, Monia) can see Calendar tab!
+    if (owner) {
+        if (viewCalendarBtn) viewCalendarBtn.style.display = 'block';
+        if (mobNavCalendar) mobNavCalendar.style.display = 'flex';
+    } else {
+        if (viewCalendarBtn) viewCalendarBtn.style.display = 'none';
+        if (mobNavCalendar) mobNavCalendar.style.display = 'none';
+        if (currentView === 'calendar') {
+            currentView = 'active';
+            if (viewActiveBtn) viewActiveBtn.click();
+        }
+    }
+
     // Hide/show prices for workers
     if (!owner) {
         document.body.classList.add('worker-hide-prices');

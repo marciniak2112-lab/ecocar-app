@@ -2185,10 +2185,7 @@ body.monia-mode .price-value {
     }
 
     .view-tabs-container {
-        width: 100%;
-        overflow-x: auto;
-        padding-bottom: 4px;
-        -webkit-overflow-scrolling: touch;
+        display: none !important;
     }
 
     .view-tabs {
@@ -2289,13 +2286,15 @@ body.monia-mode .price-value {
     }
 }
 
-/* Worker Mode: Hide Prices & Total Value & Archive */
+/* Worker Mode: Hide Prices & Total Value & Archive & Calendar */
 body.worker-hide-prices .price-blur-target,
 body.worker-hide-prices .stat-card:nth-child(2),
 body.worker-hide-prices #total-value,
 body.worker-hide-prices #archive-total-value,
 body.worker-hide-prices #view-archive,
-body.worker-hide-prices #mob-nav-archive {
+body.worker-hide-prices #mob-nav-archive,
+body.worker-hide-prices #view-calendar,
+body.worker-hide-prices #mob-nav-calendar {
     display: none !important;
 }
 
