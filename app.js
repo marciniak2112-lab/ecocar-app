@@ -1407,11 +1407,13 @@ function attachCardListeners() {
         };
     });
 
-    // Collapsible card header toggle for workers
+    // Collapsible card header toggle for mobile screens
     document.querySelectorAll('.car-card.collapsible .car-card-header-toggle').forEach(header => {
         header.onclick = () => {
-            const card = header.closest('.car-card');
-            card.classList.toggle('expanded');
+            if (window.innerWidth <= 768) {
+                const card = header.closest('.car-card');
+                card.classList.toggle('expanded');
+            }
         };
     });
 
@@ -1865,7 +1867,19 @@ function updateCountdowns() {
         const pickupStr = el.dataset.pickup;
         if (!pickupStr) return;
 
-        const targetTimeStr = el.dataset.time && el.dataset.time.trim() !== '' ? (el.dataset.time.length === 5 ? el.dataset.time + ':00' : el.dataset.time) : '23:59:59';
+        let targetTimeStr = '23:59:59';
+        if (el.dataset.time && el.dataset.time.trim() !== '') {
+            const t = el.dataset.time.trim();
+            if (/^\d{1,2}:\d{2}$/.test(t)) {
+                const parts = t.split(':');
+                targetTimeStr = `${parts[0].padStart(2, '0')}:${parts[1]}:00`;
+            } else if (/^\d{1,2}$/.test(t)) {
+                targetTimeStr = `${t.padStart(2, '0')}:00:00`;
+            } else if (/^\d{1,2}:\d{2}:\d{2}$/.test(t)) {
+                const parts = t.split(':');
+                targetTimeStr = `${parts[0].padStart(2, '0')}:${parts[1]}:${parts[2]}`;
+            }
+        }
         const pickupDate = new Date(`${pickupStr}T${targetTimeStr}`);
         const now = new Date();
         const diff = pickupDate - now;

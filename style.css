@@ -235,6 +235,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
+    align-items: start;
 }
 
 /* Switch to Row View for Archive */
@@ -345,6 +346,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: auto;
+    align-self: start;
 }
 
 .car-card:hover {
@@ -2131,50 +2133,90 @@ body.monia-mode .price-value {
     filter: grayscale(30%);
 }
 
-.car-card.collapsible {
-    min-height: 0 !important;
-    height: auto !important;
-    padding: 10px 14px;
-    margin-bottom: 8px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-color);
-    box-shadow: none;
-    transition: all 0.25s ease;
+/* Mobile: Ultra-compact collapsible car cards */
+@media (max-width: 768px) {
+    .car-card.collapsible {
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        box-shadow: none;
+        transition: all 0.25s ease;
+    }
+
+    .car-card.collapsible.expanded {
+        padding: 1.2rem;
+        background: var(--card-bg);
+        box-shadow: var(--glass-shadow);
+    }
+
+    .car-card.collapsible .toggle-icon {
+        transition: transform 0.25s ease;
+        display: inline-block;
+    }
+
+    .car-card.collapsible.expanded .toggle-icon {
+        transform: rotate(180deg);
+    }
+
+    .car-card.collapsible .card-details-collapsible {
+        display: none;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+
+    .car-card.collapsible.expanded .card-details-collapsible {
+        display: block;
+    }
+
+    .car-card-header-toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+    }
 }
 
-.car-card.collapsible.expanded {
-    padding: 1.2rem;
-    background: var(--card-bg);
-    box-shadow: var(--glass-shadow);
-}
+/* Desktop: Always expanded full cards without stretching */
+@media (min-width: 769px) {
+    .cars-grid {
+        align-items: start !important;
+    }
 
-.car-card.collapsible .toggle-icon {
-    transition: transform 0.25s ease;
-    display: inline-block;
-}
+    .car-card {
+        align-self: start !important;
+    }
 
-.car-card.collapsible.expanded .toggle-icon {
-    transform: rotate(180deg);
-}
+    .car-card.collapsible {
+        padding: 1.5rem !important;
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: var(--shadow) !important;
+        border-radius: var(--radius) !important;
+        margin-bottom: 0 !important;
+        align-self: start !important;
+    }
 
-.car-card.collapsible .card-details-collapsible {
-    display: none;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed rgba(255, 255, 255, 0.1);
-}
+    .car-card.collapsible .card-details-collapsible {
+        display: block !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        border-top: none !important;
+    }
 
-.car-card.collapsible.expanded .card-details-collapsible {
-    display: block;
-}
+    .car-card.collapsible .toggle-icon {
+        display: none !important;
+    }
 
-.car-card-header-toggle {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
+    .car-card.collapsible .car-card-header-toggle {
+        cursor: default !important;
+        margin-bottom: 0.8rem;
+    }
 }
 
 .status-pill-small {

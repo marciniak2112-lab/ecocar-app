@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.1">
+    <link rel="stylesheet" href="style.css?v=2.3">
 </head>
 
 <body class="light-theme">
@@ -470,7 +470,7 @@
                         </div>
                         <div class="form-group">
                             <label for="car-arrival-time">Godzina Przyjęcia <small style="color:var(--text-muted);">(opcjonalnie)</small></label>
-                            <input type="time" id="car-arrival-time">
+                            <input type="text" id="car-arrival-time" placeholder="np. 08:30 lub 14:00">
                         </div>
                     </div>
                     <div class="form-grid">
@@ -480,7 +480,7 @@
                         </div>
                         <div class="form-group">
                             <label for="car-pickup-time">Godzina Oddania <small style="color:var(--text-muted);">(opcjonalnie)</small></label>
-                            <input type="time" id="car-pickup-time">
+                            <input type="text" id="car-pickup-time" placeholder="np. 16:00 lub 18:30">
                         </div>
                     </div>
                     <div class="form-grid">
@@ -815,7 +815,7 @@
 
     <div id="toast-container"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script type="module" src="app.js?v=2.2"></script>
+    <script type="module" src="app.js?v=2.3"></script>
 </body>
 
 </html>
