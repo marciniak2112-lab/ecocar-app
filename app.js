@@ -239,12 +239,18 @@ function init() {
         localStorage.setItem('ecoCarReloadCount', reloadCount.toString());
         if (currentUser) {
             const checkLock = async () => {
-                const lockDoc = await getDoc(doc(db, 'settings', currentUser.toLowerCase() + '_lock'));
+                const canonical = currentUser.toLowerCase();
+                const isAdminOrOwner = canonical === 'admin' || canonical === 'tomek' || canonical === 'tomasz';
+                const lockDoc = await getDoc(doc(db, 'settings', canonical + '_lock'));
                 if (lockDoc.exists() && lockDoc.data().locked) {
-                    localStorage.removeItem('ecoCarUser');
-                    currentUser = '';
-                    location.reload();
-                    return;
+                    if (isAdminOrOwner) {
+                        await setDoc(doc(db, 'settings', canonical + '_lock'), { locked: false, suspended: false });
+                    } else {
+                        localStorage.removeItem('ecoCarUser');
+                        currentUser = '';
+                        location.reload();
+                        return;
+                    }
                 }
                 loginOverlay.style.display = 'none';
                 appContainer.style.display = 'block';
@@ -421,30 +427,30 @@ function setupLogin() {
         }
 
         const canonicalUser = userVal.toLowerCase();
+        const expectedPass = await getUserPassword(canonicalUser);
+        const isAdminOrOwner = canonicalUser === 'admin' || canonicalUser === 'tomek' || canonicalUser === 'tomasz';
 
         try {
             const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
             if (lockDoc.exists() && lockDoc.data().locked) {
-                showLockedMessage(lockDoc.data().suspended || false);
-                return;
+                // If correct password provided for Admin/Owner, automatically unlock!
+                if (isAdminOrOwner && expectedPass !== null && expectedPass === passVal) {
+                    await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
+                } else {
+                    showLockedMessage(lockDoc.data().suspended || false, canonicalUser);
+                    return;
+                }
             }
         } catch (e) { console.error("Check lock error", e); }
-
-        const validUsers = {
-            'admin': 'system02',
-            'tomek': 'tommar',
-            'monia': 'wanda',
-            'adam': '767211439',
-            'michal': '192837465',
-            'lukasz': '564738291',
-            'nastka': '908172635'
-        };
-
-        const expectedPass = await getUserPassword(canonicalUser);
 
         if (expectedPass !== null) {
             if (expectedPass === passVal) {
                 localStorage.removeItem('ecoCarFailedAttempts');
+
+                try {
+                    await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
+                } catch (e) { console.error("Unlock reset error", e); }
+
                 currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
                 if (canonicalUser === 'michal') currentUser = 'Michał';
                 if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
@@ -460,6 +466,9 @@ function setupLogin() {
                 loginPassInput.value = '';
                 loginUserInput.value = '';
                 lockedMsgEl.style.display = 'none';
+                loginBtn.style.display = 'block';
+                loginUserInput.disabled = false;
+                loginPassInput.disabled = false;
 
                 try {
                     const settingKey = canonicalUser + '_login';
@@ -480,24 +489,38 @@ function setupLogin() {
     };
 }
 
-function showLockedMessage(isSuspended = false) {
+function showLockedMessage(isSuspended = false, username = '') {
     const title = isSuspended ? "Konto Zawieszone" : "Konto Zablokowane";
-    const message = isSuspended ? "Twoje konto zostało zawieszone przez administratora." : "Przekroczono limit prób logowania. Skontaktuj się z administratorem, aby odblokować dostęp:";
+    const message = isSuspended ? "Twoje konto zostało zawieszone." : "Przekroczono limit prób logowania. Możesz zresetować blokadę poniżej:";
 
     lockedMsgEl.innerHTML = `
         <div class="locked-container" style="${isSuspended ? 'border-color: #f59e0b; background: rgba(245, 158, 11, 0.1);' : ''}">
             <h3 style="${isSuspended ? 'color: #f59e0b;' : ''}">${title}</h3>
             <p>${message}</p>
             <a href="tel:+48605595049" class="phone-link" style="${isSuspended ? 'color: #f59e0b;' : ''}">📞 605 595 049</a>
+            <div style="margin-top: 15px;">
+                <button id="btn-unlock-login" class="btn-primary" style="width: 100%; font-size: 0.9rem;">🔓 Odblokuj Ekran Logowania</button>
+            </div>
         </div>
     `;
     lockedMsgEl.style.display = 'block';
-    loginBtn.style.display = 'none';
-    loginUserInput.disabled = true;
-    loginPassInput.disabled = true;
 
-    if (isSuspended) {
-        showToast("Twoje konto zostało zawieszone!", "error");
+    const unlockBtn = document.getElementById('btn-unlock-login');
+    if (unlockBtn) {
+        unlockBtn.onclick = async () => {
+            localStorage.removeItem('ecoCarFailedAttempts');
+            if (username) {
+                try {
+                    await setDoc(doc(db, 'settings', username.toLowerCase() + '_lock'), { locked: false, suspended: false });
+                } catch (e) { console.error("Unlock reset error", e); }
+            }
+            lockedMsgEl.style.display = 'none';
+            loginBtn.style.display = 'block';
+            loginUserInput.disabled = false;
+            loginPassInput.disabled = false;
+            loginPassInput.value = '';
+            showToast("Odblokowano ekran logowania!", "success");
+        };
     }
 }
 
@@ -513,7 +536,7 @@ async function handleFailedLogin(username) {
                 timestamp: new Date().toISOString()
             });
         } catch (e) { console.error("Lock error", e); }
-        showLockedMessage();
+        showLockedMessage(false, username);
         showToast("Konto zostało zablokowane!", "error");
     } else {
         showToast(`Błędne dane! Pozostało prób: ${3 - attempts}`, "error");
