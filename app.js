@@ -654,19 +654,44 @@ function sendSystemPushNotification(title, body) {
     }
 }
 
+// Worker Helpers
+function isCarAssignedToWorker(car, user = currentUser) {
+    if (!user || !car) return false;
+    const u = user.toLowerCase();
+    if (car.workers && Array.isArray(car.workers)) {
+        return car.workers.some(w => (w || '').toLowerCase() === u);
+    }
+    if (car.worker) {
+        return car.worker.toLowerCase().split(',').map(s => s.trim()).includes(u);
+    }
+    return false;
+}
+
+function getCarWorkerDisplay(car) {
+    if (car.workers && Array.isArray(car.workers) && car.workers.length > 0) {
+        return car.workers.join(', ');
+    }
+    return car.worker || 'Nieprzypisany';
+}
+
 function populateWorkerSelects() {
-    const workerSelect = document.getElementById('car-worker');
-    if (!workerSelect) return;
+    const workersContainer = document.getElementById('car-workers-checkboxes');
+    if (!workersContainer) return;
 
     const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
     const customUserNames = customUsers.map(u => u.username);
     const allWorkers = Array.from(new Set([...defaultWorkers, ...customUserNames]))
         .filter(w => !deletedUsers.includes(w.toLowerCase()));
 
-    const currentVal = workerSelect.value;
-    workerSelect.innerHTML = '<option value="">Wybierz pracownika...</option>' +
-        allWorkers.map(w => `<option value="${w}">${w}</option>`).join('');
-    if (currentVal) workerSelect.value = currentVal;
+    const currentChecked = Array.from(workersContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+    workersContainer.innerHTML = allWorkers.map(w => `
+        <label class="checkbox-container">
+            <input type="checkbox" name="car-worker-cb" value="${w}" ${currentChecked.includes(w) ? 'checked' : ''}>
+            <span class="checkmark"></span>
+            👤 ${w}
+        </label>
+    `).join('');
 }
 
 function updateUIForRole() {
@@ -883,6 +908,7 @@ function setupCalendarNav() {
             document.getElementById('car-id').value = '';
             document.getElementById('car-arrival-date').value = selectedCalDate || '';
             document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('input[name="car-worker-cb"]').forEach(cb => cb.checked = false);
             document.getElementById('car-priority').checked = false;
             customTodos = [];
             renderCustomTodosInForm();
@@ -962,7 +988,8 @@ function renderCalendar() {
             const prefix = isOgledziny ? '🔍' : (isArrival ? '🛠️' : '🔑');
             const typeLabel = isOgledziny ? 'Oględziny' : 'Usługa';
             const pinnedClass = car.pinnedOnMain ? 'pinned' : '';
-            badgesHtml += `<span class="cal-car-badge ${badgeClass} ${pinnedClass}">${prefix} ${typeLabel}: ${car.brand}</span>`;
+            const primaryService = car.serviceName || (car.todo && car.todo.length > 0 ? (typeof car.todo[0] === 'string' ? car.todo[0] : car.todo[0].text) : typeLabel);
+            badgesHtml += `<span class="cal-car-badge ${badgeClass} ${pinnedClass}">${prefix} ${car.brand}${primaryService ? ' - ' + primaryService : ''}</span>`;
         });
 
         if (dayCars.length > 3) {
@@ -1147,7 +1174,7 @@ function renderActiveGrid(filteredCars) {
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
     const isWorkerRole = !isOwner(currentUser) && currentUser !== '';
-    const isAssignedToMe = car.worker === currentUser;
+    const isAssignedToMe = isCarAssignedToWorker(car, currentUser);
     const isOtherWorkerCar = isWorkerRole && !isAssignedToMe;
     
     // Normalize todo items into task objects
@@ -1163,7 +1190,7 @@ function generateCarCardHtml(car) {
         return `
             <div class="car-card worker-other ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
                 <div class="dates-row">
-                    <span class="worker-other-badge">👤 Przypisany: ${car.worker || 'Nieprzypisany'}</span>
+                    <span class="worker-other-badge">👤 Przypisany: ${getCarWorkerDisplay(car)}</span>
                     ${car.location ? `<span class="location-badge" style="font-size:0.75rem; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">📍 ${car.location}</span>` : ''}
                 </div>
                 <h3 style="margin-top:8px;">${car.brand}</h3>
@@ -1204,14 +1231,12 @@ function generateCarCardHtml(car) {
                 ` : ''}
                 <div class="car-info-row">
                     <span class="label">Właściciel Auta</span>
-                    <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
+                    <span class="val">${car.ownerName || '---'} ${car.ownerPhone ? '/ ' + car.ownerPhone : ''}</span>
                 </div>
-                ${car.worker ? `
                 <div class="car-info-row">
-                    <span class="label">Pracownik</span>
-                    <span class="val worker-tag">${car.worker}</span>
+                    <span class="label">Pracownik(owie)</span>
+                    <span class="val worker-tag">${getCarWorkerDisplay(car)}</span>
                 </div>
-                ` : ''}
 
                 <div class="car-info-row added-by-row" style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); padding-top: 8px; border-top: 1px dotted var(--border-color);">
                     <span>Dodane przez: <strong style="color: var(--primary-green);">${car.addedBy || 'System'}</strong></span>
@@ -1333,7 +1358,7 @@ function renderLocations() {
                 <div class="loc-car-chip">
                     <div>
                         <div class="car-name">${car.brand}</div>
-                        <div class="car-worker-tag">${car.plateNum ? car.plateNum + ' | ' : ''}Pracownik: ${car.worker || 'Nieprzypisany'}</div>
+                        <div class="car-worker-tag">${car.plateNum ? car.plateNum + ' | ' : ''}Pracownicy: ${getCarWorkerDisplay(car)}</div>
                     </div>
                     ${isManager ? `
                         <button class="loc-remove-btn" data-car-id="${car.id}" title="Usuń z tej stacji">&times;</button>
@@ -1767,6 +1792,7 @@ addCarBtn.addEventListener('click', () => {
     document.getElementById('car-service-name').value = '';
     document.getElementById('car-visit-type').value = 'usluga';
     document.querySelectorAll('input[name="todo"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[name="car-worker-cb"]').forEach(cb => cb.checked = false);
     document.getElementById('car-priority').checked = false;
     customTodos = [];
     renderCustomTodosInForm();
@@ -1848,14 +1874,20 @@ carForm.addEventListener('submit', async (e) => {
     // Merge predefined checked todos and custom added todos
     const combinedTodos = [...checkedTodos, ...customTodos];
 
+    const selectedWorkerCbs = document.querySelectorAll('input[name="car-worker-cb"]:checked');
+    const assignedWorkersArr = Array.from(selectedWorkerCbs).map(cb => cb.value);
+    const assignedWorkersStr = assignedWorkersArr.join(', ');
+
     const carData = {
         brand: document.getElementById('car-brand').value,
         plateNum: document.getElementById('car-plate').value,
         price: parseFloat(document.getElementById('car-price').value) || 0,
-        ownerName: document.getElementById('car-owner-name').value,
-        ownerPhone: document.getElementById('car-owner-phone').value,
-        history: document.getElementById('car-history').value,
-        worker: document.getElementById('car-worker').value,
+        ownerName: document.getElementById('car-owner-name').value || '',
+        ownerPhone: document.getElementById('car-owner-phone').value || '',
+        history: document.getElementById('car-history').value || '',
+        location: document.getElementById('car-location') ? document.getElementById('car-location').value : 'Brak',
+        workers: assignedWorkersArr,
+        worker: assignedWorkersStr,
         arrivalDate: document.getElementById('car-arrival-date').value,
         pickupDate: document.getElementById('car-pickup-date').value,
         serviceName: serviceName,
@@ -1931,14 +1963,22 @@ function editCar(id) {
         document.getElementById('car-plate').value = car.plateNum || '';
         document.getElementById('car-price').value = car.price;
         document.getElementById('car-owner-name').value = car.ownerName || '';
-        document.getElementById('car-owner-phone').value = car.ownerPhone;
+        document.getElementById('car-owner-phone').value = car.ownerPhone || '';
         document.getElementById('car-history').value = car.history || '';
-        document.getElementById('car-worker').value = car.worker || '';
+        if (document.getElementById('car-location')) {
+            document.getElementById('car-location').value = car.location || 'Brak';
+        }
         document.getElementById('car-arrival-date').value = car.arrivalDate || '';
         document.getElementById('car-pickup-date').value = car.pickupDate || '';
         document.getElementById('car-service-name').value = car.serviceName || '';
         document.getElementById('car-visit-type').value = car.visitType || 'usluga';
         document.getElementById('car-priority').checked = car.priority || false;
+
+        // Check assigned worker checkboxes
+        const assignedWorkers = car.workers || (car.worker ? car.worker.split(',').map(s => s.trim()) : []);
+        document.querySelectorAll('input[name="car-worker-cb"]').forEach(cb => {
+            cb.checked = assignedWorkers.includes(cb.value);
+        });
 
         // Reset and set checkboxes
         const carTodoTexts = (car.todoTasks ? car.todoTasks.map(t => t.text) : (car.todo || []));
@@ -1947,7 +1987,8 @@ function editCar(id) {
         });
 
         // Custom todos
-        customTodos = (car.todoTasks || []).filter(t => !['Konserwacja podwozia', 'Ceramika', 'Czyszczenie środka', 'Korekta lakieru', 'Pranie tapicerki'].includes(t.text));
+        const standardTodos = ['Konserwacja podwozia', 'Ceramika', 'Czyszczenie środka', 'Korekta lakieru', 'Pranie tapicerki', 'Folie klamki', 'Folie bagażnik', 'Folie progi'];
+        customTodos = (car.todoTasks || []).filter(t => !standardTodos.includes(t.text) && !t.isPrimaryService);
         renderCustomTodosInForm();
 
         carModal.classList.add('active');

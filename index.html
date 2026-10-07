@@ -445,16 +445,16 @@
                     </div>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="car-price">Wartość Usługi (PLN)</label>
-                            <input type="number" id="car-price" placeholder="0.00" required>
+                            <label for="car-price">Wartość Usługi (PLN) <small style="color:var(--text-muted);">(opcjonalnie)</small></label>
+                            <input type="number" id="car-price" placeholder="0.00">
                         </div>
                         <div class="form-group">
                             <label for="car-owner-name">Imię Właściciela Auta</label>
-                            <input type="text" id="car-owner-name" placeholder="np. Jan Kowalski" required>
+                            <input type="text" id="car-owner-name" placeholder="np. Jan Kowalski">
                         </div>
                         <div class="form-group">
-                            <label for="car-owner-phone">Telefon Właściciela Auta</label>
-                            <input type="tel" id="car-owner-phone" placeholder="123 456 789" required>
+                            <label for="car-owner-phone">Telefon Właściciela Auta <small style="color:var(--text-muted);">(opcjonalnie)</small></label>
+                            <input type="tel" id="car-owner-phone" placeholder="123 456 789">
                         </div>
                     </div>
                     <div class="form-grid">
@@ -480,25 +480,22 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="car-worker">Przypisz Pracownika</label>
-                            <select id="car-worker" class="form-select">
-                                <option value="">Wybierz pracownika...</option>
-                                <!-- Injected dynamically -->
-                            </select>
+                    <div class="form-group">
+                        <label>Przypisz Pracowników <small style="color:var(--text-muted);">(można zaznaczyć kilku)</small>:</label>
+                        <div id="car-workers-checkboxes" class="checkbox-group worker-checkbox-group">
+                            <!-- Injected dynamically -->
                         </div>
-                        <div class="form-group">
-                            <label for="car-location">Stacja / Miejsce na Hali:</label>
-                            <select id="car-location" class="form-select">
-                                <option value="Brak">Brak (Nieprzypisane)</option>
-                                <option value="Carport">Carport</option>
-                                <option value="Hala Główna">Hala Główna</option>
-                                <option value="Hala Mała">Hala Mała</option>
-                                <option value="Myjnia">Myjnia</option>
-                                <option value="Konserwacja">Konserwacja</option>
-                            </select>
-                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="car-location">Stacja / Miejsce na Hali:</label>
+                        <select id="car-location" class="form-select">
+                            <option value="Brak">Brak (Nieprzypisane)</option>
+                            <option value="Carport">Carport</option>
+                            <option value="Hala Główna">Hala Główna</option>
+                            <option value="Hala Mała">Hala Mała</option>
+                            <option value="Myjnia">Myjnia</option>
+                            <option value="Konserwacja">Konserwacja</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="car-history">Uwagi i Opis Zlecenia</label>
@@ -531,6 +528,21 @@
                                 <input type="checkbox" name="todo" value="Pranie tapicerki">
                                 <span class="checkmark"></span>
                                 Pranie tapicerki
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Folie klamki">
+                                <span class="checkmark"></span>
+                                Folie klamki
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Folie bagażnik">
+                                <span class="checkmark"></span>
+                                Folie bagażnik
+                            </label>
+                            <label class="checkbox-container">
+                                <input type="checkbox" name="todo" value="Folie progi">
+                                <span class="checkmark"></span>
+                                Folie progi
                             </label>
                         </div>
                         <div style="margin-top: 10px; display: flex; gap: 8px;">
