@@ -2287,16 +2287,79 @@ body.monia-mode .price-value {
     .form-grid {
         grid-template-columns: 1fr;
     }
+}
 
-    #toast-container {
-        bottom: 85px; /* above bottom nav */
-        right: 12px;
-        left: 12px;
+/* Worker Mode: Hide Prices & Total Value & Archive */
+body.worker-hide-prices .price-blur-target,
+body.worker-hide-prices .stat-card:nth-child(2),
+body.worker-hide-prices #total-value,
+body.worker-hide-prices #archive-total-value,
+body.worker-hide-prices #view-archive,
+body.worker-hide-prices #mob-nav-archive {
+    display: none !important;
+}
+
+/* Desktop Responsiveness Optimization (> 768px & > 1300px) */
+@media (min-width: 769px) {
+    #app {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 2rem;
     }
 
-    .toast {
-        min-width: 0;
-        padding: 10px 15px;
-        font-size: 0.85rem;
+    .main-header {
+        padding: 1.2rem 2rem;
+    }
+
+    .view-tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .tab-btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border-radius: 12px;
+    }
+
+    .cars-grid {
+        grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .locations-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .notes-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .users-status-grid {
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .trash-duty-hero {
+        padding: 2.5rem;
+        border-radius: 20px;
+    }
+
+    .trash-roster-box {
+        padding: 2rem;
+    }
+
+    .stats-overview {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+}
+
+@media (min-width: 1300px) {
+    .locations-grid {
+        grid-template-columns: repeat(5, 1fr); /* All 5 workstation cards across desktop screen */
     }
 }

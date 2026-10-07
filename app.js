@@ -674,15 +674,44 @@ function updateUIForRole() {
     const owner = isOwner(currentUser);
     const canManage = canManageLocationsAndUsers(currentUser);
 
+    // Archive access: Only Owners (Admin, Tomek, Monia) can see Archive tab!
+    if (owner) {
+        if (viewArchiveBtn) viewArchiveBtn.style.display = 'block';
+        if (mobNavArchive) mobNavArchive.style.display = 'flex';
+    } else {
+        if (viewArchiveBtn) viewArchiveBtn.style.display = 'none';
+        if (mobNavArchive) mobNavArchive.style.display = 'none';
+        if (currentView === 'archive') {
+            currentView = 'active';
+            if (viewActiveBtn) viewActiveBtn.click();
+        }
+    }
+
+    // Hide/show prices for workers
+    if (!owner) {
+        document.body.classList.add('worker-hide-prices');
+    } else {
+        document.body.classList.remove('worker-hide-prices');
+    }
+
+    // Hide price group in car form modal for workers
+    const priceInput = document.getElementById('car-price');
+    if (priceInput) {
+        const priceGroup = priceInput.closest('.form-group');
+        if (priceGroup) {
+            priceGroup.style.display = owner ? 'block' : 'none';
+        }
+    }
+
     // Admin & Tomek access to Admin Panel
     if (canManage) {
-        viewAdminBtn.style.display = 'block';
-        mobNavAdmin.style.display = 'flex';
+        if (viewAdminBtn) viewAdminBtn.style.display = 'block';
+        if (mobNavAdmin) mobNavAdmin.style.display = 'flex';
     } else {
-        viewAdminBtn.style.display = 'none';
-        mobNavAdmin.style.display = 'none';
+        if (viewAdminBtn) viewAdminBtn.style.display = 'none';
+        if (mobNavAdmin) mobNavAdmin.style.display = 'none';
         if (currentView === 'admin') {
-            viewActiveBtn.click();
+            if (viewActiveBtn) viewActiveBtn.click();
         }
     }
 
@@ -693,12 +722,12 @@ function updateUIForRole() {
 
     // Owner Notifications Button visibility
     if (owner) {
-        notifBtn.style.display = 'flex';
-        mobNavNotif.style.display = 'flex';
+        if (notifBtn) notifBtn.style.display = 'flex';
+        if (mobNavNotif) mobNavNotif.style.display = 'flex';
         requestPushNotificationPermission();
     } else {
-        notifBtn.style.display = 'none';
-        mobNavNotif.style.display = 'none';
+        if (notifBtn) notifBtn.style.display = 'none';
+        if (mobNavNotif) mobNavNotif.style.display = 'none';
     }
 
     if (role === 'monia') {
@@ -1152,10 +1181,12 @@ function generateCarCardHtml(car) {
                 
                 ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
 
+                ${isOwner(currentUser) ? `
                 <div class="car-info-row price-blur-target">
                     <span class="label">Wartość Usługi</span>
                     <span class="val">${formatCurrency(car.price)}</span>
                 </div>
+                ` : ''}
                 <div class="car-info-row">
                     <span class="label">Właściciel Auta</span>
                     <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
