@@ -313,7 +313,9 @@ const customTodosList = document.getElementById('custom-todos-list');
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log('Service Worker reg error', err));
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            reg.update();
+        }).catch(err => console.log('Service Worker reg error', err));
     });
 }
 
@@ -2775,7 +2777,7 @@ async function loadAdminData() {
                 } else {
                     showToast("Błąd generowania hasła", "error");
                 }
-            };
+            });
 
             userInfoEl.appendChild(passContainer);
         }

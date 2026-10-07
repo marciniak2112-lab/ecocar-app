@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ecocarpro-v5';
+const CACHE_NAME = 'ecocarpro-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
