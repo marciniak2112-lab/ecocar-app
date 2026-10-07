@@ -58,6 +58,23 @@ let selectedCalDate = null;
 let customTodos = [];
 let deferredPrompt = null;
 
+function getCanonicalUsername(username) {
+    if (!username) return '';
+    let canonical = username.trim().toLowerCase();
+    canonical = canonical
+        .replace(/ł/g, 'l')
+        .replace(/ą/g, 'a')
+        .replace(/ć/g, 'c')
+        .replace(/ę/g, 'e')
+        .replace(/ń/g, 'n')
+        .replace(/ó/g, 'o')
+        .replace(/ś/g, 's')
+        .replace(/ź/g, 'z')
+        .replace(/ż/g, 'z');
+    if (canonical === 'tomasz') canonical = 'tomek';
+    return canonical;
+}
+
 // Default user passwords fallback
 const DEFAULT_PASSWORDS = {
     'admin': 'system02',
@@ -71,7 +88,8 @@ const DEFAULT_PASSWORDS = {
 
 // Helper: Get Password from Firestore settings collection or fallback
 async function getUserPassword(username) {
-    const canonical = username.toLowerCase();
+    const canonical = getCanonicalUsername(username);
+    if (!canonical) return null;
     if (deletedUsers.includes(canonical)) {
         return null; // Account deleted, acts as if it never existed!
     }
@@ -517,68 +535,58 @@ function setupLogin() {
             return;
         }
 
-        const canonicalUser = userVal.toLowerCase();
+        const canonicalUser = getCanonicalUsername(userVal);
         const expectedPass = await getUserPassword(canonicalUser);
-        const isAdminOrOwner = canonicalUser === 'admin' || canonicalUser === 'tomek' || canonicalUser === 'tomasz';
 
-        try {
-            const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
-            if (lockDoc.exists() && lockDoc.data().locked) {
-                // If correct password provided for Admin/Owner, automatically unlock!
-                if (isAdminOrOwner && expectedPass !== null && expectedPass === passVal) {
-                    await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
-                } else {
+        if (expectedPass !== null && expectedPass === passVal) {
+            localStorage.removeItem('ecoCarFailedAttempts');
+
+            try {
+                await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
+            } catch (e) { console.error("Unlock reset error", e); }
+
+            currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
+            if (canonicalUser === 'michal') currentUser = 'Michał';
+            if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
+
+            localStorage.setItem('ecoCarUser', currentUser);
+            localStorage.setItem('ecoCarReloadCount', '0');
+
+            if (canonicalUser === 'nastka') {
+                applyLanguage('ua');
+            }
+
+            loginOverlay.style.display = 'none';
+            appContainer.style.display = 'block';
+            loggedUserNameEl.textContent = currentUser;
+            showToast(`Zalogowano jako ${currentUser}`, "success");
+
+            loginPassInput.value = '';
+            loginUserInput.value = '';
+            lockedMsgEl.style.display = 'none';
+            loginBtn.style.display = 'block';
+            loginUserInput.disabled = false;
+            loginPassInput.disabled = false;
+
+            try {
+                const settingKey = canonicalUser + '_login';
+                await setDoc(doc(db, 'settings', settingKey), {
+                    lastLogin: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) { console.error("Update login error", e); }
+
+            logAction(`Zalogowano użytkownika: ${currentUser}`);
+            updateUIForRole();
+            renderCars();
+        } else {
+            try {
+                const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
+                if (lockDoc.exists() && lockDoc.data().locked) {
                     showLockedMessage(lockDoc.data().suspended || false, canonicalUser);
                     return;
                 }
-            }
-        } catch (e) { console.error("Check lock error", e); }
+            } catch (e) { console.error("Check lock error", e); }
 
-        if (expectedPass !== null) {
-            if (expectedPass === passVal) {
-                localStorage.removeItem('ecoCarFailedAttempts');
-
-                try {
-                    await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
-                } catch (e) { console.error("Unlock reset error", e); }
-
-                currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
-                if (canonicalUser === 'michal') currentUser = 'Michał';
-                if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
-
-                localStorage.setItem('ecoCarUser', currentUser);
-                localStorage.setItem('ecoCarReloadCount', '0');
-
-                if (canonicalUser === 'nastka') {
-                    applyLanguage('ua');
-                }
-
-                loginOverlay.style.display = 'none';
-                appContainer.style.display = 'block';
-                loggedUserNameEl.textContent = currentUser;
-                showToast(`Zalogowano jako ${currentUser}`, "success");
-
-                loginPassInput.value = '';
-                loginUserInput.value = '';
-                lockedMsgEl.style.display = 'none';
-                loginBtn.style.display = 'block';
-                loginUserInput.disabled = false;
-                loginPassInput.disabled = false;
-
-                try {
-                    const settingKey = canonicalUser + '_login';
-                    await setDoc(doc(db, 'settings', settingKey), {
-                        lastLogin: new Date().toISOString()
-                    }, { merge: true });
-                } catch (e) { console.error("Update login error", e); }
-
-                logAction(`Zalogowano użytkownika: ${currentUser}`);
-                updateUIForRole();
-                renderCars();
-            } else {
-                handleFailedLogin(canonicalUser);
-            }
-        } else {
             handleFailedLogin(canonicalUser);
         }
     };
