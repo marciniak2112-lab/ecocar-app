@@ -2209,7 +2209,7 @@ body.monia-mode .price-value {
         -webkit-overflow-scrolling: touch;
         white-space: nowrap;
         padding: 6px 8px;
-        gap: 8px;
+        gap: 6px;
         background: var(--card-bg);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
@@ -2220,12 +2220,15 @@ body.monia-mode .price-value {
         right: 0;
         z-index: 1000;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        justify-content: space-around;
+        align-items: center;
     }
 
     .mob-nav-item {
-        flex: 0 0 auto;
+        flex: 1 1 0;
+        max-width: 90px;
         min-width: 60px;
-        padding: 4px 8px;
+        padding: 6px 4px;
         font-size: 0.68rem;
         border-radius: 8px;
         text-align: center;
@@ -2286,7 +2289,7 @@ body.monia-mode .price-value {
     }
 }
 
-/* Worker Mode: Hide Prices & Total Value & Archive & Calendar */
+/* Worker Mode: Hide Prices & Total Value & Archive & Calendar & Add Car */
 body.worker-hide-prices .price-blur-target,
 body.worker-hide-prices .stat-card:nth-child(2),
 body.worker-hide-prices #total-value,
@@ -2294,7 +2297,8 @@ body.worker-hide-prices #archive-total-value,
 body.worker-hide-prices #view-archive,
 body.worker-hide-prices #mob-nav-archive,
 body.worker-hide-prices #view-calendar,
-body.worker-hide-prices #mob-nav-calendar {
+body.worker-hide-prices #mob-nav-calendar,
+body.worker-hide-prices #add-car-btn {
     display: none !important;
 }
 

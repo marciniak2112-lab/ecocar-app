@@ -716,13 +716,15 @@ function updateUIForRole() {
         }
     }
 
-    // Admin & Tomek access to Admin Panel
+    // Admin & Tomek access to Admin Panel & Adding Cars
     if (canManage) {
         if (viewAdminBtn) viewAdminBtn.style.display = 'block';
         if (mobNavAdmin) mobNavAdmin.style.display = 'flex';
+        if (addCarBtn) addCarBtn.style.display = 'inline-flex';
     } else {
         if (viewAdminBtn) viewAdminBtn.style.display = 'none';
         if (mobNavAdmin) mobNavAdmin.style.display = 'none';
+        if (addCarBtn) addCarBtn.style.display = 'none';
         if (currentView === 'admin') {
             if (viewActiveBtn) viewActiveBtn.click();
         }
@@ -1755,6 +1757,10 @@ function formatCurrency(val) {
 
 // Modal Actions & Triggers
 addCarBtn.addEventListener('click', () => {
+    if (!canManageLocationsAndUsers(currentUser)) {
+        showToast("Tylko Admin lub Tomek może dodawać nowe auta!", "error");
+        return;
+    }
     modalTitle.textContent = 'Dodaj Nowy Samochód';
     carForm.reset();
     document.getElementById('car-id').value = '';
