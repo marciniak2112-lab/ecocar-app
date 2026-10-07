@@ -345,12 +345,14 @@ function init() {
         deletedUsers = snapshot.docs.map(doc => doc.id.toLowerCase());
         loadAdminData();
         populateWorkerSelects();
+        populateNoteWorkerSelect();
     });
 
     // Users Realtime Listener
     onSnapshot(usersCol, (snapshot) => {
         customUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         populateWorkerSelects();
+        populateNoteWorkerSelect();
     });
 
     // Notes Realtime Listener
@@ -674,15 +676,18 @@ function getCarWorkerDisplay(car) {
     return car.worker || 'Nieprzypisany';
 }
 
+function getAllWorkerNames() {
+    const defaultWorkers = ['Adam', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
+    const customUserNames = customUsers.map(u => u.username);
+    return Array.from(new Set([...defaultWorkers, ...customUserNames]))
+        .filter(w => w && !deletedUsers.includes(w.toLowerCase()));
+}
+
 function populateWorkerSelects() {
     const workersContainer = document.getElementById('car-workers-checkboxes');
     if (!workersContainer) return;
 
-    const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
-    const customUserNames = customUsers.map(u => u.username);
-    const allWorkers = Array.from(new Set([...defaultWorkers, ...customUserNames]))
-        .filter(w => !deletedUsers.includes(w.toLowerCase()));
-
+    const allWorkers = getAllWorkerNames();
     const currentChecked = Array.from(workersContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
 
     workersContainer.innerHTML = allWorkers.map(w => `
@@ -692,6 +697,19 @@ function populateWorkerSelects() {
             👤 ${w}
         </label>
     `).join('');
+}
+
+function populateNoteWorkerSelect() {
+    const noteWorkerSelect = document.getElementById('note-worker-select');
+    if (!noteWorkerSelect) return;
+
+    const currentVal = noteWorkerSelect.value;
+    const allWorkers = getAllWorkerNames();
+
+    noteWorkerSelect.innerHTML = '<option value="">-- Powiąż z pracownikiem (opcjonalnie) --</option>' +
+        allWorkers.map(w => `<option value="${w}">👤 ${w}</option>`).join('');
+
+    if (currentVal) noteWorkerSelect.value = currentVal;
 }
 
 function updateUIForRole() {
@@ -1406,6 +1424,7 @@ function setupNotesModule() {
     const noteForm = document.getElementById('note-form');
     const btnCancelNote = document.getElementById('btn-cancel-note');
     const noteCarSelect = document.getElementById('note-car-select');
+    const noteWorkerSelect = document.getElementById('note-worker-select');
 
     if (btnToggleForm && noteFormBox) {
         btnToggleForm.onclick = () => {
@@ -1415,6 +1434,7 @@ function setupNotesModule() {
                 noteCarSelect.innerHTML = '<option value="">-- Powiąż z autem (opcjonalnie) --</option>' +
                     activeCars.map(c => `<option value="${c.id}">${c.brand} ${c.plateNum ? '(' + c.plateNum + ')' : ''}</option>`).join('');
             }
+            populateNoteWorkerSelect();
         };
     }
 
@@ -1429,6 +1449,7 @@ function setupNotesModule() {
             const priority = document.getElementById('note-priority').checked;
             const carId = noteCarSelect ? noteCarSelect.value : '';
             const selectedCar = cars.find(c => c.id === carId);
+            const workerName = noteWorkerSelect ? noteWorkerSelect.value : '';
 
             if (!content) return;
 
@@ -1439,6 +1460,7 @@ function setupNotesModule() {
                     author: currentUser || 'Gość',
                     carId: carId || '',
                     carBrand: selectedCar ? selectedCar.brand : '',
+                    workerName: workerName || '',
                     createdAt: new Date().toISOString()
                 });
                 showToast("Dodano nową notatkę!", "success");
@@ -1471,7 +1493,8 @@ function renderNotes() {
                     ${n.priority ? '<span class="note-priority-badge">⚡ Wysoki Priorytet</span>' : ''}
                 </div>
                 ${n.carBrand ? `<div class="note-car-tag">🏎️ Auto: ${n.carBrand}</div>` : ''}
-                <div class="note-body">${n.content}</div>
+                ${n.workerName ? `<div class="note-worker-tag" style="font-size:0.8rem; color:var(--primary-green); font-weight:600; margin-top:4px;">👤 Powiązany Pracownik: ${n.workerName}</div>` : ''}
+                <div class="note-body" style="margin-top:6px;">${n.content}</div>
                 <div class="note-footer">
                     <span>⏱️ ${dateStr}</span>
                     ${canDelete ? `<button class="btn-icon btn-delete-note" data-id="${n.id}" style="color:#ef4444; font-size:1.2rem;" title="Usuń i przenieś do trwałego archiwum">&times;</button>` : ''}
@@ -2015,7 +2038,6 @@ async function loadAdminData() {
         { id: 'tomek', name: 'Tomek', role: 'Właściciel' },
         { id: 'monia', name: 'Monia', role: 'Właściciel' },
         { id: 'adam', name: 'Adam', role: 'Pracownik' },
-        { id: 'michal', name: 'Michał', role: 'Pracownik' },
         { id: 'lukasz', name: 'Łukasz', role: 'Pracownik' },
         { id: 'nastka', name: 'Nastka', role: 'Pracownik' }
     ];
