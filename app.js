@@ -155,18 +155,25 @@ async function changeUserPassword(username, newPassword) {
     }
 }
 
-// Helper: Check if user is Owner (Właściciel)
+// Helper: Check if user is Owner or Manager (Właściciel / Kierownik)
 function isOwner(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
+    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika' || u === 'lukasz' || u === 'łukasz';
 }
 
-// Helper: Check if user can manage locations and user accounts (Tomek or Admin)
+// Helper: Check if user can add cars (Admin, Tomek, Łukasz)
+function canAddCars(user = currentUser) {
+    if (!user) return false;
+    const u = user.toLowerCase();
+    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
+}
+
+// Helper: Check if user can manage locations and user accounts (Tomek, Admin, Łukasz - Kierownik)
 function canManageLocationsAndUsers(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz';
+    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
 }
 
 // DOM Elements
@@ -315,6 +322,11 @@ function init() {
                 loginOverlay.style.display = 'none';
                 appContainer.style.display = 'block';
                 loggedUserNameEl.textContent = currentUser;
+                if (currentUser.toLowerCase() === 'nastka') {
+                    applyLanguage('ua');
+                } else if (localStorage.getItem('ecoCarLang')) {
+                    applyLanguage(localStorage.getItem('ecoCarLang'));
+                }
                 updateUIForRole();
             };
             checkLock();
@@ -536,6 +548,10 @@ function setupLogin() {
 
                 localStorage.setItem('ecoCarUser', currentUser);
                 localStorage.setItem('ecoCarReloadCount', '0');
+
+                if (canonicalUser === 'nastka') {
+                    applyLanguage('ua');
+                }
 
                 loginOverlay.style.display = 'none';
                 appContainer.style.display = 'block';
@@ -769,15 +785,18 @@ function updateUIForRole() {
         }
     }
 
-    // Admin & Tomek access to Admin Panel & Adding Cars
+    // Admin, Tomek & Łukasz (Kierownik) access to Adding Cars
+    if (addCarBtn) {
+        addCarBtn.style.display = canAddCars(currentUser) ? 'inline-flex' : 'none';
+    }
+
+    // Admin & Tomek & Łukasz access to Admin Panel
     if (canManage) {
         if (viewAdminBtn) viewAdminBtn.style.display = 'block';
         if (mobNavAdmin) mobNavAdmin.style.display = 'flex';
-        if (addCarBtn) addCarBtn.style.display = 'inline-flex';
     } else {
         if (viewAdminBtn) viewAdminBtn.style.display = 'none';
         if (mobNavAdmin) mobNavAdmin.style.display = 'none';
-        if (addCarBtn) addCarBtn.style.display = 'none';
         if (currentView === 'admin') {
             if (viewActiveBtn) viewActiveBtn.click();
         }
@@ -1143,6 +1162,7 @@ function renderCars(filter = '') {
     }
 
     attachCardListeners();
+    translateDOM();
 }
 
 function renderArchiveRows(filteredCars) {
@@ -1233,13 +1253,16 @@ function generateCarCardHtml(car) {
 
     // Full / Collapsible Card View
     return `
-        <div class="car-card ${car.priority ? 'priority-high' : ''} ${isWorkerRole ? 'collapsible' : ''}" data-id="${car.id}">
+        <div class="car-card ${car.priority ? 'priority-high' : ''} collapsible" data-id="${car.id}">
             <div class="car-card-header-toggle">
-                <div>
-                    ${car.plateNum ? `<span class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum} </span>` : ''}
-                    <h3 style="display:inline-block;">${car.brand}</h3>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
+                    <h3 style="display:inline-block; margin:0; font-size:1rem;">${car.brand}</h3>
+                    ${car.plateNum ? `<span class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum}</span>` : ''}
                 </div>
-                ${isWorkerRole ? '<span class="toggle-icon" style="font-size:1.2rem; cursor:pointer;">▼</span>' : ''}
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="status-pill-small ${status}">${status}</span>
+                    <span class="toggle-icon" style="font-size:1.1rem; color:var(--primary-green); cursor:pointer;">▼</span>
+                </div>
             </div>
 
             <div class="card-details-collapsible">
@@ -1834,8 +1857,8 @@ function formatCurrency(val) {
 
 // Modal Actions & Triggers
 addCarBtn.addEventListener('click', () => {
-    if (!canManageLocationsAndUsers(currentUser)) {
-        showToast("Tylko Admin lub Tomek może dodawać nowe auta!", "error");
+    if (!canAddCars(currentUser)) {
+        showToast("Tylko Admin, Tomek lub Łukasz (Kierownik) może dodawać nowe auta!", "error");
         return;
     }
     modalTitle.textContent = 'Dodaj Nowy Samochód';
@@ -2059,8 +2082,107 @@ function applyLanguage(lang) {
     }
     if (lang === 'ua') {
         document.body.classList.add('lang-ua');
+        translateDOM();
     } else {
         document.body.classList.remove('lang-ua');
+        translateDOM();
+    }
+}
+
+function translateDOM() {
+    if (currentLang !== 'ua') {
+        return;
+    }
+
+    if (viewActiveBtn) viewActiveBtn.innerHTML = '🏎️ Активні';
+    if (viewLocationsBtn) viewLocationsBtn.innerHTML = '📍 Місце';
+    if (viewCalendarBtn) viewCalendarBtn.innerHTML = '📅 Календар';
+    if (viewNotesBtn) viewNotesBtn.innerHTML = '📝 Нотатки';
+    if (viewTrashBtn) viewTrashBtn.innerHTML = '🗑️ Сміття';
+    if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Архів';
+    if (viewAdminBtn) viewAdminBtn.innerHTML = '👑 Панель Адмін';
+    if (addCarBtn) addCarBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Додати авто';
+
+    const mobActiveLabel = document.querySelector('#mob-nav-active .mob-label');
+    if (mobActiveLabel) mobActiveLabel.textContent = 'Активні';
+    const mobLocLabel = document.querySelector('#mob-nav-locations .mob-label');
+    if (mobLocLabel) mobLocLabel.textContent = 'Місце';
+    const mobCalLabel = document.querySelector('#mob-nav-calendar .mob-label');
+    if (mobCalLabel) mobCalLabel.textContent = 'Календар';
+    const mobNotesLabel = document.querySelector('#mob-nav-notes .mob-label');
+    if (mobNotesLabel) mobNotesLabel.textContent = 'Нотатки';
+    const mobTrashLabel = document.querySelector('#mob-nav-trash .mob-label');
+    if (mobTrashLabel) mobTrashLabel.textContent = 'Сміття';
+
+    if (searchInput) searchInput.placeholder = 'Шукати марку, номер реєстрації, клієнта або працівника...';
+
+    const statLabels = document.querySelectorAll('.stats-overview .stat-card .label');
+    if (statLabels[0]) statLabels[0].textContent = 'Автомобілі';
+    if (statLabels[1]) statLabels[1].textContent = 'Активна вартість послуг';
+
+    document.querySelectorAll('.car-card').forEach(card => {
+        const quickNoteBtn = card.querySelector('.btn-quick-note');
+        if (quickNoteBtn) quickNoteBtn.textContent = '📝 Додати нотатку до цього авто';
+
+        const archiveBtn = card.querySelector('.btn-archive');
+        if (archiveBtn) archiveBtn.textContent = '📥 ПЕРЕНЕСТИ В АРХІВ';
+
+        card.querySelectorAll('.car-info-row .label').forEach(lbl => {
+            const txt = lbl.textContent.trim();
+            if (txt.includes('Właściciel Auta')) lbl.textContent = 'Власник авто';
+            if (txt.includes('Pracownik')) lbl.textContent = 'Працівник(и)';
+            if (txt.includes('Wartość Usługi')) lbl.textContent = 'Вартість послуги';
+            if (txt.includes('Status')) lbl.textContent = 'Статус';
+        });
+
+        const addedBySpan = card.querySelector('.added-by-row span');
+        if (addedBySpan && addedBySpan.innerHTML.includes('Dodane przez:')) {
+            addedBySpan.innerHTML = addedBySpan.innerHTML.replace('Dodane przez:', 'Додано:');
+        }
+
+        const todoLabel = card.querySelector('.todo-list-preview .label');
+        if (todoLabel) todoLabel.textContent = 'Завдання (Натисніть, щоб відмітити):';
+
+        const historyHeader = card.querySelector('.car-history-preview strong');
+        if (historyHeader && historyHeader.textContent.includes('Uwagi')) {
+            historyHeader.textContent = 'Примітки:';
+        }
+        const historyP = card.querySelector('.car-history-preview p');
+        if (historyP && historyP.innerHTML.includes('Brak uwag')) {
+            historyP.innerHTML = historyP.innerHTML.replace('Brak uwag', 'Немає приміток');
+        }
+
+        card.querySelectorAll('.btn-status').forEach(btn => {
+            const st = btn.getAttribute('data-status');
+            if (st === 'przyjedzie') btn.textContent = 'Приїде';
+            if (st === 'w-trakcie') btn.textContent = 'В процесі';
+            if (st === 'oczekuje') btn.textContent = 'Очікує';
+            if (st === 'gotowe') btn.textContent = 'Готово';
+            if (st === 'wydano') btn.textContent = 'Видано';
+        });
+
+        card.querySelectorAll('.status-pill-small, .worker-other-badge').forEach(pill => {
+            const txt = pill.textContent.trim().toLowerCase();
+            if (txt === 'przyjedzie') pill.textContent = 'Приїде';
+            else if (txt === 'w-trakcie') pill.textContent = 'В процесі';
+            else if (txt === 'oczekuje') pill.textContent = 'Очікує';
+            else if (txt === 'gotowe') pill.textContent = 'Готово';
+            else if (txt === 'wydano') pill.textContent = 'Видано';
+        });
+
+        const arrTag = card.querySelector('.arrival-date-tag');
+        if (arrTag && arrTag.textContent.includes('Przyjazd:')) {
+            arrTag.textContent = arrTag.textContent.replace('Przyjazd:', 'Приїзд:');
+        }
+        const picTag = card.querySelector('.pickup-date-tag');
+        if (picTag && picTag.textContent.includes('Odbiór:')) {
+            picTag.textContent = picTag.textContent.replace('Odbiór:', 'Видача:');
+        }
+    });
+
+    const noteAddTitle = document.querySelector('#notes-view h3');
+    if (noteAddTitle && noteAddTitle.textContent.includes('Dodaj nową notatkę')) {
+        noteAddTitle.textContent = 'Додати нову нотатку';
     }
 }
 
