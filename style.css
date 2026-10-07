@@ -344,7 +344,7 @@ body {
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
-    min-height: 420px;
+    min-height: auto;
 }
 
 .car-card:hover {
@@ -2132,6 +2132,8 @@ body.monia-mode .price-value {
 }
 
 .car-card.collapsible {
+    min-height: 0 !important;
+    height: auto !important;
     padding: 10px 14px;
     margin-bottom: 8px;
     border-radius: 12px;
@@ -2145,6 +2147,15 @@ body.monia-mode .price-value {
     padding: 1.2rem;
     background: var(--card-bg);
     box-shadow: var(--glass-shadow);
+}
+
+.car-card.collapsible .toggle-icon {
+    transition: transform 0.25s ease;
+    display: inline-block;
+}
+
+.car-card.collapsible.expanded .toggle-icon {
+    transform: rotate(180deg);
 }
 
 .car-card.collapsible .card-details-collapsible {
