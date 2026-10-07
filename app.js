@@ -88,23 +88,40 @@ const DEFAULT_PASSWORDS = {
 // Helper: Get Password from Firestore settings collection or fallback
 async function getUserPassword(username) {
     const canonical = getCanonicalUsername(username);
+    const rawLower = (username || '').trim().toLowerCase();
     if (!canonical || canonical === 'michal') return null;
-    if (deletedUsers.includes(canonical)) {
+    if (deletedUsers.includes(canonical) || deletedUsers.includes(rawLower)) {
         return null; // Account deleted, acts as if it never existed!
     }
+
+    const fetchDocWithTimeout = (docRef, timeoutMs = 2500) => {
+        return Promise.race([
+            getDoc(docRef),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+        ]);
+    };
+
     try {
-        const delDoc = await getDoc(doc(db, 'deleted_users', canonical));
+        const delDoc = await fetchDocWithTimeout(doc(db, 'deleted_users', canonical));
         if (delDoc.exists()) {
             if (!deletedUsers.includes(canonical)) deletedUsers.push(canonical);
             return null;
         }
-        const passDoc = await getDoc(doc(db, 'settings', canonical + '_pass'));
+
+        let passDoc = await fetchDocWithTimeout(doc(db, 'settings', canonical + '_pass'));
+        if (!passDoc.exists() && rawLower !== canonical) {
+            passDoc = await fetchDocWithTimeout(doc(db, 'settings', rawLower + '_pass'));
+        }
         if (passDoc.exists()) {
             if (passDoc.data().deleted) return null;
-            if (passDoc.data().password) return passDoc.data().password;
+            if (passDoc.data().password !== undefined && passDoc.data().password !== null) {
+                return String(passDoc.data().password).trim();
+            }
         }
-    } catch (e) { console.error("Get pass error", e); }
-    return DEFAULT_PASSWORDS[canonical] || null;
+    } catch (e) {
+        console.warn("Get pass error or timeout, falling back to local defaults", e);
+    }
+    return DEFAULT_PASSWORDS[canonical] ? String(DEFAULT_PASSWORDS[canonical]).trim() : null;
 }
 
 // Helper: Delete Account permanently from system
@@ -525,71 +542,106 @@ function setupNavigation() {
 }
 
 function setupLogin() {
-    loginBtn.onclick = async () => {
+    const performLogin = async () => {
         const userVal = loginUserInput.value.trim();
         const passVal = loginPassInput.value.trim();
 
         if (!userVal) {
             showToast("Podaj nazwę użytkownika", "error");
+            loginUserInput.focus();
             return;
         }
         if (!passVal) {
             showToast("Podaj hasło", "error");
+            loginPassInput.focus();
             return;
         }
 
-        const canonicalUser = getCanonicalUsername(userVal);
-        const expectedPass = await getUserPassword(canonicalUser);
+        const originalBtnText = loginBtn.textContent;
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Sprawdzanie...';
 
-        if (expectedPass !== null && expectedPass === passVal) {
-            localStorage.removeItem('ecoCarFailedAttempts');
+        try {
+            const canonicalUser = getCanonicalUsername(userVal);
+            const expectedPass = await getUserPassword(canonicalUser);
 
-            try {
-                await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
-            } catch (e) { console.error("Unlock reset error", e); }
+            const isMatch = expectedPass !== null && String(expectedPass).trim() === String(passVal).trim();
 
-            currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
-            if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
+            if (isMatch) {
+                localStorage.removeItem('ecoCarFailedAttempts');
 
-            localStorage.setItem('ecoCarUser', currentUser);
-            localStorage.setItem('ecoCarReloadCount', '0');
+                try {
+                    await setDoc(doc(db, 'settings', canonicalUser + '_lock'), { locked: false, suspended: false });
+                } catch (e) { console.error("Unlock reset error", e); }
 
-            if (canonicalUser === 'nastka') {
-                applyLanguage('ua');
-            }
+                currentUser = canonicalUser.charAt(0).toUpperCase() + canonicalUser.slice(1);
+                if (canonicalUser === 'lukasz') currentUser = 'Łukasz';
 
-            loginOverlay.style.display = 'none';
-            appContainer.style.display = 'block';
-            loggedUserNameEl.textContent = currentUser;
-            showToast(`Zalogowano jako ${currentUser}`, "success");
+                localStorage.setItem('ecoCarUser', currentUser);
+                localStorage.setItem('ecoCarReloadCount', '0');
 
-            loginPassInput.value = '';
-            loginUserInput.value = '';
-            lockedMsgEl.style.display = 'none';
-            loginBtn.style.display = 'block';
-            loginUserInput.disabled = false;
-            loginPassInput.disabled = false;
-
-            try {
-                const settingKey = canonicalUser + '_login';
-                await setDoc(doc(db, 'settings', settingKey), {
-                    lastLogin: new Date().toISOString()
-                }, { merge: true });
-            } catch (e) { console.error("Update login error", e); }
-
-            logAction(`Zalogowano użytkownika: ${currentUser}`);
-            updateUIForRole();
-            renderCars();
-        } else {
-            try {
-                const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
-                if (lockDoc.exists() && lockDoc.data().locked) {
-                    showLockedMessage(lockDoc.data().suspended || false, canonicalUser);
-                    return;
+                if (canonicalUser === 'nastka') {
+                    applyLanguage('ua');
                 }
-            } catch (e) { console.error("Check lock error", e); }
 
-            handleFailedLogin(canonicalUser);
+                loginOverlay.style.display = 'none';
+                appContainer.style.display = 'block';
+                loggedUserNameEl.textContent = currentUser;
+                showToast(`Zalogowano jako ${currentUser}`, "success");
+
+                loginPassInput.value = '';
+                loginUserInput.value = '';
+                lockedMsgEl.style.display = 'none';
+                loginBtn.style.display = 'block';
+                loginUserInput.disabled = false;
+                loginPassInput.disabled = false;
+
+                try {
+                    const settingKey = canonicalUser + '_login';
+                    await setDoc(doc(db, 'settings', settingKey), {
+                        lastLogin: new Date().toISOString()
+                    }, { merge: true });
+                } catch (e) { console.error("Update login error", e); }
+
+                logAction(`Zalogowano użytkownika: ${currentUser}`);
+                updateUIForRole();
+                renderCars();
+            } else {
+                try {
+                    const lockDoc = await getDoc(doc(db, 'settings', canonicalUser + '_lock'));
+                    if (lockDoc.exists() && lockDoc.data().locked) {
+                        showLockedMessage(lockDoc.data().suspended || false, canonicalUser);
+                        return;
+                    }
+                } catch (e) { console.error("Check lock error", e); }
+
+                handleFailedLogin(canonicalUser);
+            }
+        } catch (err) {
+            console.error("Login unexpected error", err);
+            showToast("Wystąpił problem podczas logowania. Spróbuj ponownie.", "error");
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.textContent = originalBtnText;
+        }
+    };
+
+    loginBtn.onclick = performLogin;
+
+    loginPassInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performLogin();
+        }
+    };
+    loginUserInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (loginPassInput.value) {
+                performLogin();
+            } else {
+                loginPassInput.focus();
+            }
         }
     };
 }
