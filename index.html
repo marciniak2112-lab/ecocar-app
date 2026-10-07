@@ -76,6 +76,9 @@
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
                     </button>
+                    <button id="lang-toggle-btn" class="btn-secondary" title="Zmień język / Змінити мову" style="font-weight:bold; font-size:0.8rem; padding: 0.5rem 0.7rem;">
+                        🇵🇱 PL
+                    </button>
                     <button id="help-btn" class="btn-secondary" title="Pomoc i Kontakt">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -472,16 +475,25 @@
                     </div>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="car-service-name">Główna Usługa (własny wpis):</label>
-                            <input type="text" id="car-service-name" placeholder="np. Polerowanie i nakładanie powłoki...">
-                        </div>
-                        <div class="form-group">
-                            <label for="car-visit-type">Cel Przyjazdu (Kalendarz):</label>
-                            <select id="car-visit-type" class="form-select">
-                                <option value="usluga">🛠️ Pełna Usługa / Serwis</option>
-                                <option value="ogledziny">🔍 Tylko Oględziny / Wycena</option>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label for="car-service-category">Główna Usługa (Kategoria):</label>
+                                <button type="button" id="btn-add-service-cat" style="background:none; border:none; color:var(--primary-green); font-size:0.75rem; font-weight:bold; cursor:pointer;">➕ Nowa Kategoria</button>
+                            </div>
+                            <select id="car-service-category" class="form-select">
+                                <!-- Populated dynamically -->
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="car-service-name">Własny opis / Szczegóły Usługi:</label>
+                            <input type="text" id="car-service-name" placeholder="np. Polerowanie 2-step + powłoka 3-letnia...">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="car-visit-type">Cel Przyjazdu (Kalendarz):</label>
+                        <select id="car-visit-type" class="form-select">
+                            <option value="usluga">🛠️ Pełna Usługa / Serwis</option>
+                            <option value="ogledziny">🔍 Tylko Oględziny / Wycena</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Przypisz Pracowników <small style="color:var(--text-muted);">(można zaznaczyć kilku)</small>:</label>
@@ -675,8 +687,34 @@
                 </div>
                 <form id="report-form">
                     <input type="hidden" id="report-car-id">
+                    
+                    <!-- Company Details (Saved automatically in LocalStorage) -->
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 8px; font-size: 0.9rem; color: var(--primary-green);">🏢 Dane Firmy do Protokołu (Zapisywane na stałe)</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="company-name" style="font-size:0.8rem;">Nazwa Firmy:</label>
+                                <input type="text" id="company-name" placeholder="np. EcoCarPro Detailing Studio">
+                            </div>
+                            <div class="form-group">
+                                <label for="company-nip" style="font-size:0.8rem;">NIP / REGON:</label>
+                                <input type="text" id="company-nip" placeholder="np. 123-456-78-90">
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="company-address" style="font-size:0.8rem;">Adres Firmy:</label>
+                                <input type="text" id="company-address" placeholder="np. ul. Warsztatowa 10, Warszawa">
+                            </div>
+                            <div class="form-group">
+                                <label for="company-phone" style="font-size:0.8rem;">Telefon Firmy:</label>
+                                <input type="text" id="company-phone" placeholder="np. +48 500 600 700">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label for="report-hours">Ile godzin nam to zeszło</label>
+                        <label for="report-hours">Ile godzin trwały prace (godz.):</label>
                         <input type="number" id="report-hours" placeholder="np. 5">
                     </div>
                     <div class="form-group" id="ceramic-options-group" style="display: none;">
@@ -691,27 +729,55 @@
                     <div class="form-group ai-generator-box"
                         style="background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 10px; border: 1px dashed rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
                         <label for="report-keywords" style="color: var(--primary-green); font-weight: 600;">Wygeneruj
-                            profesjonalny opis (Symulacja AI)</label>
+                            profesjonalny opis prac (AI)</label>
                         <input type="text" id="report-keywords"
-                            placeholder="Wpisz parę słów: np. pranie foteli, usunięcie rys, twardy wosk..."
+                            placeholder="Wpisz parę słów: np. pranie foteli, korekta lakieru, ceramika..."
                             style="margin-bottom: 10px;">
                         <button type="button" id="btn-generate-ai" class="btn-secondary"
                             style="width: 100%; border-color: var(--primary-green); color: var(--primary-green); font-weight: bold; margin-bottom: 10px;">✨
                             Generuj Opis AI</button>
-                        <label for="report-notes">Gotowy opis raportu na podstawie słów kluczowych</label>
+                        <label for="report-notes">Opis wykonanych prac (Można edytować):</label>
                         <textarea id="report-notes" rows="4"
-                            placeholder="Opis usługi zostanie tutaj wygenerowany..."></textarea>
+                            placeholder="Wpisz lekki opis wykonanych prac..."></textarea>
                     </div>
-                    <div class="form-group">
-                        <label>Zdjęcia PRZED</label>
-                        <input type="file" id="report-photos-before" accept="image/*" multiple>
+
+                    <!-- Photo Uploads & Previews -->
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Zdjęcia PRZED:</label>
+                            <input type="file" id="report-photos-before" accept="image/*" multiple>
+                            <div id="photos-before-preview" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Zdjęcia PO:</label>
+                            <input type="file" id="report-photos-after" accept="image/*" multiple>
+                            <div id="photos-after-preview" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Zdjęcia PO</label>
-                        <input type="file" id="report-photos-after" accept="image/*" multiple>
+
+                    <!-- Signatures Section -->
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); margin-top: 15px; margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 10px; font-size: 0.9rem; color: var(--primary-green);">✍️ Podpisy Elektroniczne</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <label style="font-size:0.8rem; margin:0;">Podpis Klienta:</label>
+                                    <button type="button" id="btn-clear-client-sig" style="background:none; border:none; color:#ef4444; font-size:0.7rem; cursor:pointer;">Wyczyść</button>
+                                </div>
+                                <canvas id="client-sig-canvas" width="280" height="100" style="background:#fff; border:1px solid #ccc; border-radius:6px; touch-action:none; width:100%; height:100px;"></canvas>
+                            </div>
+                            <div class="form-group">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <label style="font-size:0.8rem; margin:0;">Podpis Właściciela Firmy:</label>
+                                    <button type="button" id="btn-clear-owner-sig" style="background:none; border:none; color:#ef4444; font-size:0.7rem; cursor:pointer;">Wyczyść</button>
+                                </div>
+                                <canvas id="owner-sig-canvas" width="280" height="100" style="background:#fff; border:1px solid #ccc; border-radius:6px; touch-action:none; width:100%; height:100px;"></canvas>
+                            </div>
+                        </div>
                     </div>
+
                     <div class="form-actions">
-                        <button type="submit" class="btn-submit">Pobierz PDF</button>
+                        <button type="submit" class="btn-submit">📄 Generuj i Pobierz Protokół PDF / Drukuj</button>
                     </div>
                 </form>
             </div>

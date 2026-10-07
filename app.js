@@ -398,6 +398,16 @@ function init() {
     // PWA Install Handlers
     setupPWA();
 
+    // Language Toggle
+    setupLanguageToggle();
+
+    // Dynamic Service Categories
+    listenServiceCategories();
+    setupAddServiceCategory();
+
+    // Report Form Protocol
+    setupReportForm();
+
     // Custom Todos Handler
     if (addCustomTodoBtn && customTodoInput) {
         addCustomTodoBtn.onclick = () => {
@@ -1297,6 +1307,10 @@ function generateCarCardHtml(car) {
                     ` : ''}
                 </div>
 
+                <div style="margin-top: 8px;">
+                    <button class="btn-secondary btn-quick-note" data-car-id="${car.id}" data-car-brand="${car.brand}" style="width: 100%; font-size: 0.78rem; padding: 6px 10px;">📝 Dodaj notatkę do tego auta</button>
+                </div>
+
                 ${!car.archived ? `
                 <div class="status-actions">
                     <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
@@ -1329,6 +1343,21 @@ function attachCardListeners() {
     });
     document.querySelectorAll('.btn-status:not(.btn-archive)').forEach(btn => {
         btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
+    });
+    document.querySelectorAll('.btn-quick-note').forEach(btn => {
+        btn.onclick = () => {
+            const cId = btn.dataset.carId;
+            switchTab('notes');
+            const noteFormBox = document.getElementById('new-note-form-box');
+            if (noteFormBox) noteFormBox.style.display = 'block';
+            const noteCarSelect = document.getElementById('note-car-select');
+            if (noteCarSelect) {
+                const activeCars = cars.filter(c => !c.archived);
+                noteCarSelect.innerHTML = '<option value="">-- Powiąż z autem (opcjonalnie) --</option>' +
+                    activeCars.map(c => `<option value="${c.id}">${c.brand} ${c.plateNum ? '(' + c.plateNum + ')' : ''}</option>`).join('');
+                noteCarSelect.value = cId;
+            }
+        };
     });
 
     // Collapsible card header toggle for workers
@@ -2018,6 +2047,169 @@ function editCar(id) {
     }
 }
 
+// Ukrainian Language & Translation Support
+let currentLang = localStorage.getItem('ecoCarLang') || 'pl';
+
+function applyLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('ecoCarLang', lang);
+    const langBtn = document.getElementById('lang-toggle-btn');
+    if (langBtn) {
+        langBtn.textContent = lang === 'ua' ? '🇺🇦 UA' : '🇵🇱 PL';
+    }
+    if (lang === 'ua') {
+        document.body.classList.add('lang-ua');
+    } else {
+        document.body.classList.remove('lang-ua');
+    }
+}
+
+function setupLanguageToggle() {
+    const langBtn = document.getElementById('lang-toggle-btn');
+    if (langBtn) {
+        langBtn.onclick = () => {
+            const nextLang = currentLang === 'pl' ? 'ua' : 'pl';
+            applyLanguage(nextLang);
+            showToast(nextLang === 'ua' ? 'Переключено на українську мову 🇺🇦' : 'Przełączono na język polski 🇵🇱', 'info');
+        };
+    }
+}
+
+// Dynamic Main Service Categories
+let serviceCategories = [
+    'Konserwacja podwozia',
+    'Ceramika / Powłoka ochronna',
+    'Czyszczenie środka / Detailing wnętrza',
+    'Korekta lakieru / Polerowanie',
+    'Pranie tapicerki',
+    'Folie ochronne PPF (Klamki, Progi, Bagażnik)',
+    'Przygotowanie do sprzedaży',
+    'Oględziny / Wycena'
+];
+
+function listenServiceCategories() {
+    const catRef = doc(db, 'settings', 'service_categories_doc');
+    onSnapshot(catRef, (snap) => {
+        if (snap.exists() && snap.data().categories) {
+            const savedCats = snap.data().categories;
+            serviceCategories = Array.from(new Set([...serviceCategories, ...savedCats]));
+        }
+        populateServiceCategoryDropdown();
+    });
+}
+
+function populateServiceCategoryDropdown() {
+    const select = document.getElementById('car-service-category');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">-- Wybierz kategorię główną --</option>' +
+        serviceCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (currentVal) select.value = currentVal;
+}
+
+function setupAddServiceCategory() {
+    const btn = document.getElementById('btn-add-service-cat');
+    if (!btn) return;
+    btn.onclick = async () => {
+        if (!canManageLocationsAndUsers(currentUser)) {
+            showToast("Tylko Admin i Tomek mogą dodawać nowe kategorie usług!", "error");
+            return;
+        }
+        const newCat = prompt("Wpisz nazwę nowej kategorii głównej (zostanie zapisana na stałe w aplikacji):");
+        if (newCat && newCat.trim() !== '') {
+            const cleanCat = newCat.trim();
+            if (!serviceCategories.includes(cleanCat)) {
+                serviceCategories.push(cleanCat);
+                try {
+                    const catRef = doc(db, 'settings', 'service_categories_doc');
+                    await setDoc(catRef, { categories: serviceCategories, updatedAt: new Date().toISOString() }, { merge: true });
+                    showToast(`Dodano i zapisano na stałe kategorię: ${cleanCat}`, "success");
+                    logAction(`${currentUser} dodał nową kategorię usługi: ${cleanCat}`);
+                    populateServiceCategoryDropdown();
+                    const select = document.getElementById('car-service-category');
+                    if (select) select.value = cleanCat;
+                } catch (e) { showToast("Błąd zapisu kategorii", "error"); }
+            }
+        }
+    };
+}
+
+// Signature Canvas & Report Protocol Generator
+function loadCompanyDetails() {
+    const saved = localStorage.getItem('ecoCarCompanyDetails');
+    if (saved) {
+        try {
+            const details = JSON.parse(saved);
+            if (document.getElementById('company-name')) document.getElementById('company-name').value = details.name || '';
+            if (document.getElementById('company-nip')) document.getElementById('company-nip').value = details.nip || '';
+            if (document.getElementById('company-address')) document.getElementById('company-address').value = details.address || '';
+            if (document.getElementById('company-phone')) document.getElementById('company-phone').value = details.phone || '';
+        } catch (e) {}
+    }
+}
+
+function saveCompanyDetails() {
+    const details = {
+        name: document.getElementById('company-name') ? document.getElementById('company-name').value : '',
+        nip: document.getElementById('company-nip') ? document.getElementById('company-nip').value : '',
+        address: document.getElementById('company-address') ? document.getElementById('company-address').value : '',
+        phone: document.getElementById('company-phone') ? document.getElementById('company-phone').value : ''
+    };
+    localStorage.setItem('ecoCarCompanyDetails', JSON.stringify(details));
+}
+
+function setupSignatureCanvas(canvasId, clearBtnId) {
+    const canvas = document.getElementById(canvasId);
+    const clearBtn = document.getElementById(clearBtnId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+    };
+
+    const startDraw = (e) => {
+        drawing = true;
+        ctx.beginPath();
+        const pos = getPos(e);
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#000';
+    };
+
+    const draw = (e) => {
+        if (!drawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    };
+
+    const stopDraw = () => { drawing = false; };
+
+    canvas.onmousedown = startDraw;
+    canvas.onmousemove = draw;
+    canvas.onmouseup = stopDraw;
+    canvas.ontouchstart = startDraw;
+    canvas.ontouchmove = draw;
+    canvas.ontouchend = stopDraw;
+
+    if (clearBtn) {
+        clearBtn.onclick = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+    }
+}
+
 function openReportModal(id) {
     if (currentUser === 'Monia') {
         showToast("Tylko Admin i Tomek posiadają uprawnienia do tworzenia raportów.", "error");
@@ -2026,7 +2218,124 @@ function openReportModal(id) {
 
     reportCarIdInput.value = id;
     reportForm.reset();
+    loadCompanyDetails();
+    setupSignatureCanvas('client-sig-canvas', 'btn-clear-client-sig');
+    setupSignatureCanvas('owner-sig-canvas', 'btn-clear-owner-sig');
+
+    const car = cars.find(c => c.id === id);
+    if (car && document.getElementById('report-notes')) {
+        document.getElementById('report-notes').value = `Wykonano usługę dla pojazdu ${car.brand} (${car.plateNum || 'brak tablic'}). Przeprowadzono inspekcję końcową oraz prace detailingowe zgodnie ze zleceniem.`;
+    }
+
     reportModal.classList.add('active');
+}
+
+function setupReportForm() {
+    if (!reportForm) return;
+
+    reportForm.onsubmit = (e) => {
+        e.preventDefault();
+        saveCompanyDetails();
+
+        const carId = reportCarIdInput.value;
+        const car = cars.find(c => c.id === carId);
+
+        const compName = document.getElementById('company-name').value || 'EcoCarPro Studio';
+        const compNip = document.getElementById('company-nip').value || '---';
+        const compAddress = document.getElementById('company-address').value || '---';
+        const compPhone = document.getElementById('company-phone').value || '---';
+
+        const hours = document.getElementById('report-hours').value || '---';
+        const notes = document.getElementById('report-notes').value || 'Brak opisu.';
+
+        const clientCanvas = document.getElementById('client-sig-canvas');
+        const ownerCanvas = document.getElementById('owner-sig-canvas');
+        const clientSigImg = clientCanvas ? clientCanvas.toDataURL() : '';
+        const ownerSigImg = ownerCanvas ? ownerCanvas.toDataURL() : '';
+
+        const printWin = window.open('', '_blank');
+        if (!printWin) {
+            showToast("Zezwól na wyskakujące okienka (Pop-up), aby pobrać/wydrukować Protokół!", "error");
+            return;
+        }
+
+        const dateNow = new Date().toLocaleString('pl-PL');
+
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Protokół Odbioru / Wykonania Usługi - ${car ? car.brand : 'EcoCarPro'}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 25px; color: #111; line-height: 1.5; }
+                    .header-table { width: 100%; border-bottom: 2px solid #10b981; padding-bottom: 15px; margin-bottom: 20px; }
+                    .company-box { text-align: right; font-size: 0.9rem; }
+                    .title { font-size: 1.6rem; font-weight: bold; color: #10b981; margin: 0; }
+                    .section { margin-bottom: 20px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+                    .section-title { font-weight: bold; color: #10b981; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem; }
+                    .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+                    .sig-box { text-align: center; width: 45%; border: 1px dashed #aaa; padding: 10px; border-radius: 8px; }
+                    .sig-img { max-width: 100%; height: 80px; object-fit: contain; }
+                    @media print { body { padding: 0; } }
+                </style>
+            </head>
+            <body>
+                <table class="header-table">
+                    <tr>
+                        <td>
+                            <div class="title">🏎️ EcoCarPro</div>
+                            <div style="font-size: 0.9rem; color: #555;">PROTOKÓŁ WYKONANIA USŁUGI / ODBIORU</div>
+                            <div style="font-size: 0.8rem; color: #888;">Data wystawienia: ${dateNow}</div>
+                        </td>
+                        <td class="company-box">
+                            <strong>${compName}</strong><br>
+                            NIP: ${compNip}<br>
+                            Adres: ${compAddress}<br>
+                            Tel: ${compPhone}
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="section">
+                    <div class="section-title">📌 DANE POJAZDU I ZLECENIODAWCY</div>
+                    <div class="info-grid">
+                        <div><strong>Marka i Model:</strong> ${car ? car.brand : '---'}</div>
+                        <div><strong>Numer Rejestracyjny:</strong> ${car && car.plateNum ? car.plateNum : '---'}</div>
+                        <div><strong>Właściciel Pojazdu:</strong> ${car && car.ownerName ? car.ownerName : '---'}</div>
+                        <div><strong>Telefon Właściciela:</strong> ${car && car.ownerPhone ? car.ownerPhone : '---'}</div>
+                        <div><strong>Czas realizacji prac:</strong> ${hours} godz.</div>
+                        <div><strong>Wartość Zlecenia:</strong> ${car && car.price ? car.price + ' PLN' : 'Opcjonalnie'}</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📝 OPIS WYKONANYCH PRAC I ZAKRES USŁUGI</div>
+                    <p style="white-space: pre-wrap; font-size: 0.9rem;">${notes}</p>
+                </div>
+
+                <div class="signatures">
+                    <div class="sig-box">
+                        <div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 8px;">PODPIS KLIENTA / ODBIORCY</div>
+                        <img src="${clientSigImg}" class="sig-img" alt="Podpis Klienta">
+                    </div>
+                    <div class="sig-box">
+                        <div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 8px;">PODPIS WŁAŚCICIELA FIRMY / WYKONAWCY</div>
+                        <img src="${ownerSigImg}" class="sig-img" alt="Podpis Właściciela">
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+        reportModal.classList.remove('active');
+    };
 }
 
 async function loadAdminData() {
