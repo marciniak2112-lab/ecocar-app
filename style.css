@@ -2147,7 +2147,7 @@ body.monia-mode .price-value {
 @media (max-width: 768px) {
     #app {
         padding: 0.6rem;
-        padding-bottom: 85px; /* space for bottom nav */
+        padding-bottom: 90px; /* space for fixed bottom nav */
     }
 
     .main-header {
@@ -2188,6 +2188,7 @@ body.monia-mode .price-value {
         width: 100%;
         overflow-x: auto;
         padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
     }
 
     .view-tabs {
@@ -2206,8 +2207,31 @@ body.monia-mode .price-value {
     }
 
     .mobile-bottom-nav {
-        display: flex;
-        justify-content: space-around;
+        display: flex !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        padding: 6px 8px;
+        gap: 8px;
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-color);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .mob-nav-item {
+        flex: 0 0 auto;
+        min-width: 60px;
+        padding: 4px 8px;
+        font-size: 0.68rem;
+        border-radius: 8px;
+        text-align: center;
     }
 
     .calendar-day-tile {
@@ -2229,19 +2253,35 @@ body.monia-mode .price-value {
         gap: 0.8rem;
     }
 
-    .cars-grid {
+    .cars-grid, .locations-grid, .notes-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     .users-status-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .user-status-card {
+        padding: 1rem;
+    }
+
+    .pass-preview {
+        gap: 8px;
+    }
+
+    .btn-delete-user-account {
+        font-size: 0.8rem !important;
+        padding: 8px 12px !important;
     }
 
     .modal-content {
         padding: 1.2rem;
         width: 95%;
-        margin: 5px;
+        margin: 5px auto;
         max-height: 85vh;
+        border-radius: 16px;
     }
 
     .form-grid {
@@ -2249,7 +2289,7 @@ body.monia-mode .price-value {
     }
 
     #toast-container {
-        bottom: 75px; /* above bottom nav */
+        bottom: 85px; /* above bottom nav */
         right: 12px;
         left: 12px;
     }

@@ -37,6 +37,7 @@ const usersCol = collection(db, 'users');
 const notesCol = collection(db, 'notes');
 const archivedNotesCol = collection(db, 'archived_notes');
 const trashCol = collection(db, 'trash_schedule');
+const deletedUsersCol = collection(db, 'deleted_users');
 
 // State Management
 let cars = [];
@@ -45,6 +46,7 @@ let notes = [];
 let archivedNotes = [];
 let trashSchedule = [];
 let customUsers = [];
+let deletedUsers = [];
 let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'archive', 'admin'
 let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Michał', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
@@ -70,13 +72,71 @@ const DEFAULT_PASSWORDS = {
 // Helper: Get Password from Firestore settings collection or fallback
 async function getUserPassword(username) {
     const canonical = username.toLowerCase();
+    if (deletedUsers.includes(canonical)) {
+        return null; // Account deleted, acts as if it never existed!
+    }
     try {
+        const delDoc = await getDoc(doc(db, 'deleted_users', canonical));
+        if (delDoc.exists()) {
+            if (!deletedUsers.includes(canonical)) deletedUsers.push(canonical);
+            return null;
+        }
         const passDoc = await getDoc(doc(db, 'settings', canonical + '_pass'));
-        if (passDoc.exists() && passDoc.data().password) {
-            return passDoc.data().password;
+        if (passDoc.exists()) {
+            if (passDoc.data().deleted) return null;
+            if (passDoc.data().password) return passDoc.data().password;
         }
     } catch (e) { console.error("Get pass error", e); }
     return DEFAULT_PASSWORDS[canonical] || null;
+}
+
+// Helper: Delete Account permanently from system
+async function deleteAccount(userId, userName) {
+    const canonical = userId.toLowerCase();
+    if (canonical === 'admin' || canonical === 'tomek') {
+        showToast("Nie można usunąć głównego administratora!", "error");
+        return false;
+    }
+
+    const confirmed = await showConfirm(`Czy na pewno chcesz TRWALE USUNĄĆ konto "${userName}"? Login i hasło przestaną działać, tak jakby konta nigdy nie było!`, "TRWALE USUŃ KONTO", "ANULUJ", true);
+    if (confirmed) {
+        try {
+            await setDoc(doc(db, 'deleted_users', canonical), {
+                username: userName,
+                canonical: canonical,
+                deletedAt: new Date().toISOString(),
+                deletedBy: currentUser || 'Admin'
+            });
+            await setDoc(doc(db, 'settings', canonical + '_pass'), {
+                deleted: true,
+                password: null,
+                updatedAt: new Date().toISOString()
+            });
+            try {
+                await deleteDoc(doc(db, 'users', canonical));
+            } catch (e) {}
+
+            if (!deletedUsers.includes(canonical)) deletedUsers.push(canonical);
+
+            showToast(`Trwale usunięto konto "${userName}". Login i hasło nie działają!`, "success");
+            logAction(`${currentUser} trwale usunął konto: ${userName}`);
+
+            if (currentUser.toLowerCase() === canonical) {
+                currentUser = '';
+                localStorage.removeItem('ecoCarUser');
+                location.reload();
+            } else {
+                loadAdminData();
+                populateWorkerSelects();
+            }
+            return true;
+        } catch (err) {
+            console.error("Delete account error", err);
+            showToast("Błąd podczas usuwania konta", "error");
+            return false;
+        }
+    }
+    return false;
 }
 
 // Helper: Change Password in Firestore settings collection
@@ -278,6 +338,13 @@ function init() {
     onSnapshot(notifQ, (snapshot) => {
         notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         updateNotificationsUI();
+    });
+
+    // Deleted Users Realtime Listener
+    onSnapshot(deletedUsersCol, (snapshot) => {
+        deletedUsers = snapshot.docs.map(doc => doc.id.toLowerCase());
+        loadAdminData();
+        populateWorkerSelects();
     });
 
     // Users Realtime Listener
@@ -593,7 +660,8 @@ function populateWorkerSelects() {
 
     const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
     const customUserNames = customUsers.map(u => u.username);
-    const allWorkers = Array.from(new Set([...defaultWorkers, ...customUserNames]));
+    const allWorkers = Array.from(new Set([...defaultWorkers, ...customUserNames]))
+        .filter(w => !deletedUsers.includes(w.toLowerCase()));
 
     const currentVal = workerSelect.value;
     workerSelect.innerHTML = '<option value="">Wybierz pracownika...</option>' +
@@ -1875,42 +1943,30 @@ async function loadAdminData() {
         }
     });
 
-    const allUsers = Array.from(allUsersMap.values());
+    const activeUsers = Array.from(allUsersMap.values()).filter(u => !deletedUsers.includes(u.id.toLowerCase()));
 
-    usersStatusGrid.innerHTML = allUsers.map(u => `
-        <div class="user-status-card glass" id="status-${u.id}">
-            <div class="user-avatar">${u.name.charAt(0).toUpperCase()}</div>
-            <div class="user-info" style="width: 100%;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h4>${u.name} <span style="font-size:0.75rem; color:var(--text-muted);">(${u.role})</span></h4>
-                    ${u.isCustom ? `<button class="btn-icon btn-delete-custom-user" data-username="${u.id}" title="Usuń konto" style="color:#ef4444;">&times;</button>` : ''}
+    if (activeUsers.length === 0) {
+        usersStatusGrid.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:1.5rem; grid-column:1/-1;">Brak aktywnych kont w systemie.</p>';
+    } else {
+        usersStatusGrid.innerHTML = activeUsers.map(u => `
+            <div class="user-status-card glass" id="status-${u.id}">
+                <div class="user-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                <div class="user-info" style="width: 100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <h4>${u.name} <span style="font-size:0.75rem; color:var(--text-muted);">(${u.role})</span></h4>
+                    </div>
+                    <div class="status-indicator">
+                        <span>Checking...</span>
+                    </div>
+                    <p class="last-login">Ostatnie logowanie: <span class="time">Nigdy</span></p>
                 </div>
-                <div class="status-indicator">
-                    <span>Checking...</span>
-                </div>
-                <p class="last-login">Ostatnie logowanie: <span class="time">Nigdy</span></p>
             </div>
-        </div>
-    `).join('');
-
-    usersStatusGrid.querySelectorAll('.btn-delete-custom-user').forEach(btn => {
-        btn.onclick = async () => {
-            const uId = btn.dataset.username;
-            const confirmed = await showConfirm(`Czy na pewno chcesz usunąć konto użytkownika ${uId}?`, "USUŃ KONTO", "ANULUJ", true);
-            if (confirmed) {
-                try {
-                    await deleteDoc(doc(db, 'users', uId));
-                    await deleteDoc(doc(db, 'settings', uId + '_pass'));
-                    showToast(`Usunięto konto: ${uId}`, "success");
-                    logAction(`${currentUser} usunął konto użytkownika: ${uId}`);
-                    loadAdminData();
-                } catch (e) { showToast("Błąd usuwania konta", "error"); }
-            }
-        };
-    });
+        `).join('');
+    }
 
     const updateStatusCard = async (uObj) => {
         const userId = uObj.id;
+        const userName = uObj.name;
         const docRef = doc(db, 'settings', userId + '_login');
         const d = await getDoc(docRef);
         const card = document.getElementById('status-' + userId);
@@ -1940,6 +1996,8 @@ async function loadAdminData() {
         const lockSnap = await getDoc(lockRef);
         const isLocked = lockSnap.exists() && lockSnap.data().locked;
 
+        const userInfoEl = card.querySelector('.user-info');
+
         const existingBtn = card.querySelector('.unlock-btn');
         if (existingBtn) existingBtn.remove();
 
@@ -1948,24 +2006,24 @@ async function loadAdminData() {
         if (!isLocked) {
             actionBtn.style.background = '#f59e0b';
         }
-        actionBtn.textContent = isLocked ? 'Odblokuj Konto' : 'Zawieś Konto';
+        actionBtn.textContent = isLocked ? 'Odblokuj Dostęp' : 'Zawieś Konto';
 
         actionBtn.onclick = async () => {
             if (isLocked) {
                 await setDoc(lockRef, { locked: false, suspended: false });
-                showToast(`Odblokowano użytkownika ${userId}`, "success");
+                showToast(`Odblokowano użytkownika ${userName}`, "success");
             } else {
-                const confirmed = await showConfirm(`Czy na pewno chcesz zawiesić konto użytkownika ${userId}?`, 'ZAWIEŚ', 'ANULUJ', true);
+                const confirmed = await showConfirm(`Czy na pewno chcesz zawiesić konto użytkownika ${userName}?`, 'ZAWIEŚ', 'ANULUJ', true);
                 if (confirmed) {
                     await setDoc(lockRef, { locked: true, suspended: true, timestamp: new Date().toISOString() });
-                    showToast(`Zawieszono użytkownika ${userId}`, "error");
+                    showToast(`Zawieszono użytkownika ${userName}`, "error");
                 }
             }
             loadAdminData();
         };
-        card.querySelector('.user-info').appendChild(actionBtn);
+        userInfoEl.appendChild(actionBtn);
 
-        const pass = (await getUserPassword(userId)) || DEFAULT_PASSWORDS[userId.toLowerCase()] || '123456789';
+        const pass = await getUserPassword(userId);
         if (pass) {
             const existingPass = card.querySelector('.pass-preview');
             if (existingPass) existingPass.remove();
@@ -2002,13 +2060,13 @@ async function loadAdminData() {
             };
 
             passContainer.querySelector('.btn-edit-pass').onclick = async () => {
-                const newPass = prompt(`Wpisz nowe hasło dla użytkownika ${userId}:`, pass);
+                const newPass = prompt(`Wpisz nowe hasło dla użytkownika ${userName}:`, pass);
                 if (newPass !== null && newPass.trim() !== '') {
                     const cleanPass = newPass.trim();
                     const success = await changeUserPassword(userId, cleanPass);
                     if (success) {
-                        showToast(`Pomyślnie zmieniono i zapisano hasło dla ${userId}!`, "success");
-                        logAction(`Admin zmienił hasło dla użytkownika ${userId}`);
+                        showToast(`Pomyślnie zmieniono i zapisano hasło dla ${userName}!`, "success");
+                        logAction(`Admin zmienił hasło dla użytkownika ${userName}`);
                         loadAdminData();
                     } else {
                         showToast("Błąd zmiany hasła", "error");
@@ -2020,19 +2078,33 @@ async function loadAdminData() {
                 const randomPass = Math.floor(100000000 + Math.random() * 900000000).toString();
                 const success = await changeUserPassword(userId, randomPass);
                 if (success) {
-                    showToast(`Wygenerowano i zapisano nowe hasło dla ${userId}: ${randomPass}`, "success");
-                    logAction(`Admin wygenerował nowe losowe hasło dla ${userId}`);
+                    showToast(`Wygenerowano i zapisano nowe hasło dla ${userName}: ${randomPass}`, "success");
+                    logAction(`Admin wygenerował nowe losowe hasło dla ${userName}`);
                     loadAdminData();
                 } else {
                     showToast("Błąd generowania hasła", "error");
                 }
             };
 
-            card.querySelector('.user-info').appendChild(passContainer);
+            userInfoEl.appendChild(passContainer);
+        }
+
+        // Add Delete Account Button for any account except admin and tomek
+        if (userId !== 'admin' && userId !== 'tomek') {
+            const existingDelBtn = card.querySelector('.btn-delete-user-account');
+            if (existingDelBtn) existingDelBtn.remove();
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-delete-user-account';
+            delBtn.style.cssText = 'background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #ef4444; font-size: 0.75rem; font-weight: bold; padding: 6px 10px; border-radius: 6px; width: 100%; margin-top: 8px; cursor: pointer; transition: all 0.2s ease;';
+            delBtn.textContent = '🗑️ Usuń Konto (Trwale)';
+
+            delBtn.onclick = () => deleteAccount(userId, userName);
+            userInfoEl.appendChild(delBtn);
         }
     };
 
-    for (const uObj of allUsers) {
+    for (const uObj of activeUsers) {
         await updateStatusCard(uObj);
     }
 
