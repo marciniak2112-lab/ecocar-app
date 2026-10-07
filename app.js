@@ -1267,12 +1267,12 @@ function generateCarCardHtml(car) {
 
             <div class="card-details-collapsible">
                 <div class="dates-row" style="margin-top:8px;">
-                    ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
-                    ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}</span>` : ''}
+                    ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}${car.arrivalTime ? ' godz. ' + car.arrivalTime : ''}</span>` : ''}
+                    ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}${car.pickupTime ? ' godz. ' + car.pickupTime : ''}</span>` : ''}
                     ${car.location ? `<span class="location-badge" style="background:rgba(16,185,129,0.15); color:var(--primary-green); padding:2px 8px; border-radius:6px; font-size:0.75rem;">📍 ${car.location}</span>` : ''}
                 </div>
                 
-                ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
+                ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}" data-time="${car.pickupTime || ''}"></div>` : ''}
 
                 ${isOwner(currentUser) ? `
                 <div class="car-info-row price-blur-target">
@@ -1816,7 +1816,8 @@ function updateCountdowns() {
         const pickupStr = el.dataset.pickup;
         if (!pickupStr) return;
 
-        const pickupDate = new Date(pickupStr + 'T23:59:59');
+        const timeStr = el.dataset.time && el.dataset.time.trim() !== '' ? (el.dataset.time.length === 5 ? el.dataset.time + ':00' : el.dataset.time) : '23:59:59';
+        const pickupDate = new Date(`${pickupStr}T${timeStr}`);
         const now = new Date();
         const diff = pickupDate - now;
 
@@ -1964,7 +1965,9 @@ carForm.addEventListener('submit', async (e) => {
         workers: assignedWorkersArr,
         worker: assignedWorkersStr,
         arrivalDate: document.getElementById('car-arrival-date').value,
+        arrivalTime: document.getElementById('car-arrival-time') ? document.getElementById('car-arrival-time').value : '',
         pickupDate: document.getElementById('car-pickup-date').value,
+        pickupTime: document.getElementById('car-pickup-time') ? document.getElementById('car-pickup-time').value : '',
         serviceName: serviceName,
         visitType: visitType,
         todoTasks: combinedTodos,
@@ -2044,7 +2047,9 @@ function editCar(id) {
             document.getElementById('car-location').value = car.location || 'Brak';
         }
         document.getElementById('car-arrival-date').value = car.arrivalDate || '';
+        document.getElementById('car-arrival-time').value = car.arrivalTime || '';
         document.getElementById('car-pickup-date').value = car.pickupDate || '';
+        document.getElementById('car-pickup-time').value = car.pickupTime || '';
         document.getElementById('car-service-name').value = car.serviceName || '';
         document.getElementById('car-visit-type').value = car.visitType || 'usluga';
         document.getElementById('car-priority').checked = car.priority || false;
