@@ -1839,6 +1839,311 @@ body.monia-mode .price-value {
     max-width: 450px;
 }
 
+/* Locations / Stacje Robocze Section */
+.locations-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.section-title-bar {
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title-bar h2 {
+    font-size: 1.4rem;
+    color: var(--primary-green);
+    margin-bottom: 0.2rem;
+}
+
+.section-title-bar .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.locations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.location-card {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 220px;
+    background: var(--card-bg);
+}
+
+.loc-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.loc-card-header h3 {
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.loc-count-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--primary-green);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.loc-cars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 250px;
+}
+
+.loc-car-chip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+.loc-car-chip .car-name {
+    font-weight: 600;
+}
+
+.loc-car-chip .car-worker-tag {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.loc-remove-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+}
+
+.loc-admin-controls {
+    margin-top: auto;
+    padding-top: 0.5rem;
+}
+
+/* Notes Section */
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+
+.note-card {
+    background: var(--card-bg);
+    padding: 1.25rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: relative;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.note-card:hover {
+    transform: translateY(-2px);
+}
+
+.note-card.priority-high {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), var(--card-bg));
+}
+
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.note-author {
+    font-weight: 700;
+    color: var(--primary-green);
+}
+
+.note-priority-badge {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+}
+
+.note-car-tag {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    width: fit-content;
+}
+
+.note-body {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    flex: 1;
+}
+
+.note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Trash Duty Section */
+.trash-duty-hero {
+    padding: 2rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), var(--card-bg));
+}
+
+.duty-badge {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    font-weight: 700;
+    color: var(--primary-green);
+}
+
+.duty-person-box {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.mega-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: var(--primary-green);
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.duty-person-info h2 {
+    font-size: 1.8rem;
+    text-align: left;
+}
+
+.duty-person-info .duty-date {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.trash-roster-box {
+    padding: 1.5rem;
+}
+
+.trash-schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.trash-schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.trash-schedule-item.current-week {
+    border-color: var(--primary-green);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.trash-week-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.trash-person-name {
+    font-weight: 700;
+    color: var(--primary-green);
+}
+
+/* Worker Greyed Out View & Collapsible Cards */
+.car-card.worker-other {
+    opacity: 0.55;
+    filter: grayscale(80%);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.car-card.worker-other:hover {
+    opacity: 0.9;
+    filter: grayscale(30%);
+}
+
+.car-card.collapsible .card-details-collapsible {
+    display: none;
+}
+
+.car-card.collapsible.expanded .card-details-collapsible {
+    display: block;
+}
+
+.car-card-header-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.worker-other-badge {
+    background: rgba(148, 163, 184, 0.2);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     #app {
         padding: 0.6rem;

@@ -33,11 +33,19 @@ const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const carsCol = collection(db, 'cars');
 const notificationsCol = collection(db, 'notifications');
+const usersCol = collection(db, 'users');
+const notesCol = collection(db, 'notes');
+const archivedNotesCol = collection(db, 'archived_notes');
+const trashCol = collection(db, 'trash_schedule');
 
 // State Management
 let cars = [];
 let notifications = [];
-let currentView = 'active'; // 'active', 'calendar', 'archive', or 'admin'
+let notes = [];
+let archivedNotes = [];
+let trashSchedule = [];
+let customUsers = [];
+let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'archive', 'admin'
 let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Michał', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
 
@@ -94,9 +102,20 @@ function isOwner(user = currentUser) {
     return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
 }
 
+// Helper: Check if user can manage locations and user accounts (Tomek or Admin)
+function canManageLocationsAndUsers(user = currentUser) {
+    if (!user) return false;
+    const u = user.toLowerCase();
+    return u === 'admin' || u === 'tomek' || u === 'tomasz';
+}
+
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
 const calendarSection = document.getElementById('calendar-section');
+const locationsSection = document.getElementById('locations-section');
+const notesSection = document.getElementById('notes-section');
+const trashSection = document.getElementById('trash-section');
+
 const calendarGrid = document.getElementById('calendar-grid');
 const calMonthYearEl = document.getElementById('cal-month-year');
 const calPrevMonthBtn = document.getElementById('cal-prev-month');
@@ -117,13 +136,19 @@ const moonIcon = document.getElementById('moon-icon');
 
 // Navigation Tabs
 const viewActiveBtn = document.getElementById('view-active');
+const viewLocationsBtn = document.getElementById('view-locations');
 const viewCalendarBtn = document.getElementById('view-calendar');
+const viewNotesBtn = document.getElementById('view-notes');
+const viewTrashBtn = document.getElementById('view-trash');
 const viewArchiveBtn = document.getElementById('view-archive');
 const viewAdminBtn = document.getElementById('view-admin');
 
 // Mobile Bottom Nav Items
 const mobNavActive = document.getElementById('mob-nav-active');
+const mobNavLocations = document.getElementById('mob-nav-locations');
 const mobNavCalendar = document.getElementById('mob-nav-calendar');
+const mobNavNotes = document.getElementById('mob-nav-notes');
+const mobNavTrash = document.getElementById('mob-nav-trash');
 const mobNavArchive = document.getElementById('mob-nav-archive');
 const mobNavAdmin = document.getElementById('mob-nav-admin');
 const mobNavNotif = document.getElementById('mob-nav-notif');
@@ -236,6 +261,7 @@ function init() {
         cars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         processAutoArchiving();
         renderCars();
+        renderLocations();
         renderCalendar();
         updateStats();
         updateCountdowns();
@@ -248,10 +274,45 @@ function init() {
         updateNotificationsUI();
     });
 
+    // Users Realtime Listener
+    onSnapshot(usersCol, (snapshot) => {
+        customUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        populateWorkerSelects();
+    });
+
+    // Notes Realtime Listener
+    const notesQ = query(notesCol, orderBy('createdAt', 'desc'));
+    onSnapshot(notesQ, (snapshot) => {
+        notes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderNotes();
+    });
+
+    // Archived Notes Realtime Listener
+    const archivedNotesQ = query(archivedNotesCol, orderBy('deletedAt', 'desc'), limit(50));
+    onSnapshot(archivedNotesQ, (snapshot) => {
+        archivedNotes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderArchivedNotesList();
+    });
+
+    // Trash Schedule Listener
+    const trashDocRef = doc(db, 'settings', 'trash_schedule_doc');
+    onSnapshot(trashDocRef, (snap) => {
+        if (snap.exists() && snap.data().schedule) {
+            trashSchedule = snap.data().schedule;
+        }
+        renderTrashSchedule();
+    });
+
     setInterval(updateCountdowns, 1000);
 
     // Navigation Click Handlers
     setupNavigation();
+
+    // Notes Module Handlers
+    setupNotesModule();
+
+    // Account Creation Handlers
+    setupAccountCreation();
 
     // Login Handler
     setupLogin();
@@ -279,38 +340,59 @@ function setupNavigation() {
     const switchTab = (targetView) => {
         currentView = targetView;
         viewActiveBtn.classList.toggle('active', targetView === 'active');
+        if (viewLocationsBtn) viewLocationsBtn.classList.toggle('active', targetView === 'locations');
         viewCalendarBtn.classList.toggle('active', targetView === 'calendar');
+        if (viewNotesBtn) viewNotesBtn.classList.toggle('active', targetView === 'notes');
+        if (viewTrashBtn) viewTrashBtn.classList.toggle('active', targetView === 'trash');
         viewArchiveBtn.classList.toggle('active', targetView === 'archive');
         viewAdminBtn.classList.toggle('active', targetView === 'admin');
 
         // Mobile Nav sync
         mobNavActive.classList.toggle('active', targetView === 'active');
+        if (mobNavLocations) mobNavLocations.classList.toggle('active', targetView === 'locations');
         mobNavCalendar.classList.toggle('active', targetView === 'calendar');
+        if (mobNavNotes) mobNavNotes.classList.toggle('active', targetView === 'notes');
+        if (mobNavTrash) mobNavTrash.classList.toggle('active', targetView === 'trash');
         mobNavArchive.classList.toggle('active', targetView === 'archive');
         mobNavAdmin.classList.toggle('active', targetView === 'admin');
 
         // Display sections
         carsGrid.style.display = (targetView === 'active' || targetView === 'archive') ? 'grid' : 'none';
+        if (locationsSection) locationsSection.style.display = (targetView === 'locations') ? 'block' : 'none';
         calendarSection.style.display = (targetView === 'calendar') ? 'block' : 'none';
+        if (notesSection) notesSection.style.display = (targetView === 'notes') ? 'block' : 'none';
+        if (trashSection) trashSection.style.display = (targetView === 'trash') ? 'block' : 'none';
         adminSection.style.display = (targetView === 'admin') ? 'block' : 'none';
         archiveControls.style.display = (targetView === 'archive') ? 'flex' : 'none';
 
         if (targetView === 'active' || targetView === 'archive') {
             renderCars(searchInput.value);
+        } else if (targetView === 'locations') {
+            renderLocations();
         } else if (targetView === 'calendar') {
             renderCalendar();
+        } else if (targetView === 'notes') {
+            renderNotes();
+        } else if (targetView === 'trash') {
+            renderTrashSchedule();
         } else if (targetView === 'admin') {
             loadAdminData();
         }
     };
 
     viewActiveBtn.onclick = () => switchTab('active');
+    if (viewLocationsBtn) viewLocationsBtn.onclick = () => switchTab('locations');
     viewCalendarBtn.onclick = () => switchTab('calendar');
+    if (viewNotesBtn) viewNotesBtn.onclick = () => switchTab('notes');
+    if (viewTrashBtn) viewTrashBtn.onclick = () => switchTab('trash');
     viewArchiveBtn.onclick = () => switchTab('archive');
     viewAdminBtn.onclick = () => switchTab('admin');
 
     mobNavActive.onclick = () => switchTab('active');
+    if (mobNavLocations) mobNavLocations.onclick = () => switchTab('locations');
     mobNavCalendar.onclick = () => switchTab('calendar');
+    if (mobNavNotes) mobNavNotes.onclick = () => switchTab('notes');
+    if (mobNavTrash) mobNavTrash.onclick = () => switchTab('trash');
     mobNavArchive.onclick = () => switchTab('archive');
     mobNavAdmin.onclick = () => switchTab('admin');
 
@@ -482,12 +564,27 @@ function sendSystemPushNotification(title, body) {
     }
 }
 
+function populateWorkerSelects() {
+    const workerSelect = document.getElementById('car-worker');
+    if (!workerSelect) return;
+
+    const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka', 'Tomek', 'Monia', 'Admin'];
+    const customUserNames = customUsers.map(u => u.username);
+    const allWorkers = Array.from(new Set([...defaultWorkers, ...customUserNames]));
+
+    const currentVal = workerSelect.value;
+    workerSelect.innerHTML = '<option value="">Wybierz pracownika...</option>' +
+        allWorkers.map(w => `<option value="${w}">${w}</option>`).join('');
+    if (currentVal) workerSelect.value = currentVal;
+}
+
 function updateUIForRole() {
     const role = (currentUser || '').toLowerCase();
     const owner = isOwner(currentUser);
+    const canManage = canManageLocationsAndUsers(currentUser);
 
-    // Admin Panel access
-    if (role === 'admin') {
+    // Admin & Tomek access to Admin Panel
+    if (canManage) {
         viewAdminBtn.style.display = 'block';
         mobNavAdmin.style.display = 'flex';
     } else {
@@ -496,6 +593,11 @@ function updateUIForRole() {
         if (currentView === 'admin') {
             viewActiveBtn.click();
         }
+    }
+
+    const accountBox = document.getElementById('account-creation-box');
+    if (accountBox) {
+        accountBox.style.display = canManage ? 'block' : 'none';
     }
 
     // Owner Notifications Button visibility
@@ -513,6 +615,8 @@ function updateUIForRole() {
     } else {
         document.body.classList.remove('monia-mode');
     }
+
+    populateWorkerSelects();
 }
 
 // Notifications Logic for Owners
@@ -907,6 +1011,9 @@ function renderActiveGrid(filteredCars) {
 
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
+    const isWorkerRole = !isOwner(currentUser) && currentUser !== '';
+    const isAssignedToMe = car.worker === currentUser;
+    const isOtherWorkerCar = isWorkerRole && !isAssignedToMe;
     
     // Normalize todo items into task objects
     let tasks = [];
@@ -916,85 +1023,113 @@ function generateCarCardHtml(car) {
         tasks = car.todo.map(t => typeof t === 'string' ? { text: t, done: false } : t);
     }
 
+    if (isOtherWorkerCar) {
+        // Greyed-out minimal view for other worker's car
+        return `
+            <div class="car-card worker-other ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
+                <div class="dates-row">
+                    <span class="worker-other-badge">👤 Przypisany: ${car.worker || 'Nieprzypisany'}</span>
+                    ${car.location ? `<span class="location-badge" style="font-size:0.75rem; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">📍 ${car.location}</span>` : ''}
+                </div>
+                <h3 style="margin-top:8px;">${car.brand}</h3>
+                ${car.plateNum ? `<div class="car-info-row" style="color: var(--text-muted); font-size: 0.8rem;">📌 ${car.plateNum}</div>` : ''}
+                <div class="car-info-row" style="font-size:0.8rem; margin-top:6px;">
+                    <span class="label">Status:</span>
+                    <span class="val">${status}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Full / Collapsible Card View
     return `
-        <div class="car-card ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
-            <div class="dates-row">
-                ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
-                ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}</span>` : ''}
-            </div>
-            
-            ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
-
-            ${car.plateNum ? `<div class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum}</div>` : ''}
-            <h3>${car.brand}</h3>
-            <div class="car-info-row price-blur-target">
-                <span class="label">Wartość Usługi</span>
-                <span class="val">${formatCurrency(car.price)}</span>
-            </div>
-            <div class="car-info-row">
-                <span class="label">Właściciel Auta</span>
-                <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
-            </div>
-            ${car.worker ? `
-            <div class="car-info-row">
-                <span class="label">Pracownik</span>
-                <span class="val worker-tag">${car.worker}</span>
-            </div>
-            ` : ''}
-
-            <div class="car-info-row added-by-row" style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); padding-top: 8px; border-top: 1px dotted var(--border-color);">
-                <span>Dodane przez: <strong style="color: var(--primary-green);">${car.addedBy || 'System'}</strong></span>
-            </div>
-            
-            ${tasks.length > 0 ? `
-            <div class="todo-list-preview">
-                <span class="label">Zadania Do Zrobienia (Kliknij aby odznaczyć):</span>
-                <ul class="todo-interactive-list">
-                    ${tasks.map((task, idx) => `
-                        <li class="todo-interactive-item ${task.done ? 'done' : ''}" data-car-id="${car.id}" data-idx="${idx}">
-                            <div class="todo-check-box">
-                                <span>${task.done ? '✅' : '⏹️'}</span>
-                                <span>${task.text}</span>
-                            </div>
-                            ${task.done && task.doneBy ? `
-                                <span class="todo-done-info">Wykonane: ${task.doneBy}</span>
-                            ` : ''}
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-            ` : ''}
-
-            <div class="car-history-preview">
-                <p><strong>Uwagi:</strong><br>${car.history || 'Brak uwag'}</p>
+        <div class="car-card ${car.priority ? 'priority-high' : ''} ${isWorkerRole ? 'collapsible' : ''}" data-id="${car.id}">
+            <div class="car-card-header-toggle">
+                <div>
+                    ${car.plateNum ? `<span class="car-info-row" style="color: var(--primary-green); font-size: 0.8rem; font-weight: 700;">📌 ${car.plateNum} </span>` : ''}
+                    <h3 style="display:inline-block;">${car.brand}</h3>
+                </div>
+                ${isWorkerRole ? '<span class="toggle-icon" style="font-size:1.2rem; cursor:pointer;">▼</span>' : ''}
             </div>
 
-            <div class="card-actions">
-                ${(!car.archived || currentUser === 'Admin') ? `
-                <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                </button>
-                ` : ''}
+            <div class="card-details-collapsible">
+                <div class="dates-row" style="margin-top:8px;">
+                    ${car.status === 'przyjedzie' && car.arrivalDate ? `<span class="arrival-date-tag">📅 Przyjazd: ${car.arrivalDate}</span>` : ''}
+                    ${car.pickupDate ? `<span class="pickup-date-tag">🔑 Odbiór: ${car.pickupDate}</span>` : ''}
+                    ${car.location ? `<span class="location-badge" style="background:rgba(16,185,129,0.15); color:var(--primary-green); padding:2px 8px; border-radius:6px; font-size:0.75rem;">📍 ${car.location}</span>` : ''}
+                </div>
                 
-                ${(!car.archived || currentUser === 'Admin') ? `
-                <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                </button>
+                ${car.pickupDate && !car.archived ? `<div class="countdown-timer" data-pickup="${car.pickupDate}"></div>` : ''}
+
+                <div class="car-info-row price-blur-target">
+                    <span class="label">Wartość Usługi</span>
+                    <span class="val">${formatCurrency(car.price)}</span>
+                </div>
+                <div class="car-info-row">
+                    <span class="label">Właściciel Auta</span>
+                    <span class="val">${car.ownerName || '---'} / ${car.ownerPhone}</span>
+                </div>
+                ${car.worker ? `
+                <div class="car-info-row">
+                    <span class="label">Pracownik</span>
+                    <span class="val worker-tag">${car.worker}</span>
+                </div>
+                ` : ''}
+
+                <div class="car-info-row added-by-row" style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); padding-top: 8px; border-top: 1px dotted var(--border-color);">
+                    <span>Dodane przez: <strong style="color: var(--primary-green);">${car.addedBy || 'System'}</strong></span>
+                </div>
+                
+                ${tasks.length > 0 ? `
+                <div class="todo-list-preview">
+                    <span class="label">Zadania Do Zrobienia (Kliknij aby odznaczyć):</span>
+                    <ul class="todo-interactive-list">
+                        ${tasks.map((task, idx) => `
+                            <li class="todo-interactive-item ${task.done ? 'done' : ''}" data-car-id="${car.id}" data-idx="${idx}">
+                                <div class="todo-check-box">
+                                    <span>${task.done ? '✅' : '⏹️'}</span>
+                                    <span>${task.text}</span>
+                                </div>
+                                ${task.done && task.doneBy ? `
+                                    <span class="todo-done-info">Wykonane: ${task.doneBy}</span>
+                                ` : ''}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+
+                <div class="car-history-preview">
+                    <p><strong>Uwagi:</strong><br>${car.history || 'Brak uwag'}</p>
+                </div>
+
+                <div class="card-actions">
+                    ${(!car.archived || currentUser === 'Admin') ? `
+                    <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    ` : ''}
+                    
+                    ${(!car.archived || currentUser === 'Admin') ? `
+                    <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                    ` : ''}
+                </div>
+
+                ${!car.archived ? `
+                <div class="status-actions">
+                    <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
+                    <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
+                    <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
+                </div>
+                <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
+                    <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
+                        📥 PRZENIEŚ DO ARCHIWUM
+                    </button>
+                </div>
                 ` : ''}
             </div>
-
-            ${!car.archived ? `
-            <div class="status-actions">
-                <button class="btn-status ${status === 'przyjedzie' ? 'active' : ''}" data-id="${car.id}" data-status="przyjedzie">Przyjedzie</button>
-                <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
-                <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
-            </div>
-            <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
-                <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
-                    📥 PRZENIEŚ DO ARCHIWUM
-                </button>
-            </div>
-            ` : ''}
         </div>
     `;
 }
@@ -1016,6 +1151,14 @@ function attachCardListeners() {
         btn.onclick = () => updateCarStatus(btn.dataset.id, btn.dataset.status);
     });
 
+    // Collapsible card header toggle for workers
+    document.querySelectorAll('.car-card.collapsible .car-card-header-toggle').forEach(header => {
+        header.onclick = () => {
+            const card = header.closest('.car-card');
+            card.classList.toggle('expanded');
+        };
+    });
+
     // Interactive To-do Item Click Handlers
     document.querySelectorAll('.todo-interactive-item').forEach(item => {
         item.onclick = (e) => {
@@ -1025,6 +1168,319 @@ function attachCardListeners() {
             toggleCarTask(carId, taskIdx);
         };
     });
+}
+
+// Locations (Stacje Robocze) Logic
+function renderLocations() {
+    if (!locationsSection) return;
+    const isManager = canManageLocationsAndUsers(currentUser);
+    const stations = ['Carport', 'Hala Główna', 'Hala Mała', 'Myjnia', 'Konserwacja'];
+    const activeCars = cars.filter(c => !c.archived);
+
+    stations.forEach(station => {
+        const card = locationsSection.querySelector(`.location-card[data-station="${station}"]`);
+        if (!card) return;
+
+        const carsContainer = card.querySelector('.loc-cars-container');
+        const countBadge = card.querySelector('.loc-count-badge');
+        const adminControls = card.querySelector('.loc-admin-controls');
+        const select = card.querySelector('.loc-assign-select');
+
+        const stationCars = activeCars.filter(c => c.location === station);
+        countBadge.textContent = `${stationCars.length} aut`;
+
+        if (stationCars.length === 0) {
+            carsContainer.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px;">Brak aut w tej stacji.</p>';
+        } else {
+            carsContainer.innerHTML = stationCars.map(car => `
+                <div class="loc-car-chip">
+                    <div>
+                        <div class="car-name">${car.brand}</div>
+                        <div class="car-worker-tag">${car.plateNum ? car.plateNum + ' | ' : ''}Pracownik: ${car.worker || 'Nieprzypisany'}</div>
+                    </div>
+                    ${isManager ? `
+                        <button class="loc-remove-btn" data-car-id="${car.id}" title="Usuń z tej stacji">&times;</button>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        if (isManager) {
+            adminControls.style.display = 'block';
+            const unassignedCars = activeCars.filter(c => c.location !== station);
+            select.innerHTML = `<option value="">+ Ustaw auto w: ${station}...</option>` +
+                unassignedCars.map(c => `<option value="${c.id}">${c.brand} (${c.plateNum || 'brak tablic'}) ${c.location ? '[' + c.location + ']' : ''}</option>`).join('');
+
+            select.onchange = async () => {
+                const cId = select.value;
+                if (!cId) return;
+                try {
+                    await updateDoc(doc(db, 'cars', cId), { location: station });
+                    showToast(`Ustawiono auto w stacji: ${station}`, "success");
+                    logAction(`${currentUser} ustawił auto w stacji: ${station}`);
+                } catch (e) { showToast("Błąd ustawiania lokalizacji", "error"); }
+            };
+        } else {
+            adminControls.style.display = 'none';
+        }
+
+        carsContainer.querySelectorAll('.loc-remove-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const cId = btn.dataset.carId;
+                try {
+                    await updateDoc(doc(db, 'cars', cId), { location: 'Brak' });
+                    showToast("Usunięto auto ze stacji roboczej.", "info");
+                    logAction(`${currentUser} usunął auto ze stacji: ${station}`);
+                } catch (e) { showToast("Błąd", "error"); }
+            };
+        });
+    });
+}
+
+// Notes Module Logic
+function setupNotesModule() {
+    const btnToggleForm = document.getElementById('btn-toggle-new-note-form');
+    const noteFormBox = document.getElementById('new-note-form-box');
+    const noteForm = document.getElementById('note-form');
+    const btnCancelNote = document.getElementById('btn-cancel-note');
+    const noteCarSelect = document.getElementById('note-car-select');
+
+    if (btnToggleForm && noteFormBox) {
+        btnToggleForm.onclick = () => {
+            noteFormBox.style.display = noteFormBox.style.display === 'none' ? 'block' : 'none';
+            if (noteCarSelect) {
+                const activeCars = cars.filter(c => !c.archived);
+                noteCarSelect.innerHTML = '<option value="">-- Powiąż z autem (opcjonalnie) --</option>' +
+                    activeCars.map(c => `<option value="${c.id}">${c.brand} ${c.plateNum ? '(' + c.plateNum + ')' : ''}</option>`).join('');
+            }
+        };
+    }
+
+    if (btnCancelNote && noteFormBox) {
+        btnCancelNote.onclick = () => noteFormBox.style.display = 'none';
+    }
+
+    if (noteForm) {
+        noteForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('note-content').value.trim();
+            const priority = document.getElementById('note-priority').checked;
+            const carId = noteCarSelect ? noteCarSelect.value : '';
+            const selectedCar = cars.find(c => c.id === carId);
+
+            if (!content) return;
+
+            try {
+                await addDoc(notesCol, {
+                    content: content,
+                    priority: priority,
+                    author: currentUser || 'Gość',
+                    carId: carId || '',
+                    carBrand: selectedCar ? selectedCar.brand : '',
+                    createdAt: new Date().toISOString()
+                });
+                showToast("Dodano nową notatkę!", "success");
+                logAction(`Użytkownik ${currentUser} dodał notatkę`);
+                noteForm.reset();
+                if (noteFormBox) noteFormBox.style.display = 'none';
+            } catch (err) {
+                showToast("Błąd dodawania notatki", "error");
+            }
+        };
+    }
+}
+
+function renderNotes() {
+    const notesGrid = document.getElementById('notes-grid');
+    if (!notesGrid) return;
+
+    if (notes.length === 0) {
+        notesGrid.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:2rem; grid-column:1/-1;">Brak aktywnych notatek. Kliknij "➕ Nowa Notatka", aby dodać wpis.</p>';
+        return;
+    }
+
+    notesGrid.innerHTML = notes.map(n => {
+        const canDelete = canManageLocationsAndUsers(currentUser) || currentUser === n.author;
+        const dateStr = new Date(n.createdAt).toLocaleString('pl-PL');
+        return `
+            <div class="note-card ${n.priority ? 'priority-high' : ''}">
+                <div class="note-header">
+                    <span class="note-author">✍️ ${n.author}</span>
+                    ${n.priority ? '<span class="note-priority-badge">⚡ Wysoki Priorytet</span>' : ''}
+                </div>
+                ${n.carBrand ? `<div class="note-car-tag">🏎️ Auto: ${n.carBrand}</div>` : ''}
+                <div class="note-body">${n.content}</div>
+                <div class="note-footer">
+                    <span>⏱️ ${dateStr}</span>
+                    ${canDelete ? `<button class="btn-icon btn-delete-note" data-id="${n.id}" style="color:#ef4444; font-size:1.2rem;" title="Usuń i przenieś do trwałego archiwum">&times;</button>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    notesGrid.querySelectorAll('.btn-delete-note').forEach(btn => {
+        btn.onclick = async () => {
+            const nId = btn.dataset.id;
+            const noteObj = notes.find(n => n.id === nId);
+            if (!noteObj) return;
+
+            const confirmed = await showConfirm("Czy na pewno chcesz usunąć tę notatkę? Zostanie zarchiwizowana w serwerowym rejestrze.", "USUŃ", "ANULUJ", true);
+            if (confirmed) {
+                try {
+                    await addDoc(archivedNotesCol, {
+                        ...noteObj,
+                        deletedBy: currentUser || 'Admin',
+                        deletedAt: new Date().toISOString()
+                    });
+                    await deleteDoc(doc(db, 'notes', nId));
+                    showToast("Notatka usunięta i zarchiwizowana!", "success");
+                    logAction(`Usunięto notatkę przez ${currentUser}`);
+                } catch (e) { showToast("Błąd usuwania notatki", "error"); }
+            }
+        };
+    });
+}
+
+function renderArchivedNotesList() {
+    const listEl = document.getElementById('archived-notes-list');
+    if (!listEl) return;
+
+    if (archivedNotes.length === 0) {
+        listEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Brak usuniętych notatek w archiwum.</p>';
+        return;
+    }
+
+    listEl.innerHTML = archivedNotes.map(n => `
+        <div style="background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted); font-size:0.75rem; margin-bottom:4px;">
+                <span>Autor: <strong style="color:var(--primary-green);">${n.author}</strong> ${n.priority ? '⚡ Priorytet' : ''}</span>
+                <span>Usunął: <strong>${n.deletedBy || 'Admin'}</strong> (${new Date(n.deletedAt).toLocaleDateString('pl-PL')})</span>
+            </div>
+            <div>${n.content}</div>
+        </div>
+    `).join('');
+}
+
+// Trash Duty Module
+function renderTrashSchedule() {
+    if (!trashSection) return;
+    const isManager = canManageLocationsAndUsers(currentUser);
+    const randomizeBtn = document.getElementById('btn-randomize-trash');
+    if (randomizeBtn) randomizeBtn.style.display = isManager ? 'block' : 'none';
+
+    const defaultWorkers = ['Adam', 'Michał', 'Łukasz', 'Nastka'];
+
+    if (trashSchedule.length === 0) {
+        const now = new Date();
+        trashSchedule = [0, 1, 2, 3].map(i => {
+            const startDate = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+            const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
+            return {
+                weekIndex: i,
+                worker: defaultWorkers[i % defaultWorkers.length],
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+            };
+        });
+    }
+
+    const currentWeekItem = trashSchedule[0] || { worker: 'Nieprzypisany', startDate: '', endDate: '' };
+
+    const dutyAvatarEl = document.getElementById('trash-duty-avatar');
+    const dutyNameEl = document.getElementById('trash-duty-name');
+    const dutyDateRangeEl = document.getElementById('trash-duty-date-range');
+    const scheduleListEl = document.getElementById('trash-schedule-list');
+
+    if (dutyAvatarEl) dutyAvatarEl.textContent = (currentWeekItem.worker || '?').charAt(0).toUpperCase();
+    if (dutyNameEl) dutyNameEl.textContent = currentWeekItem.worker || 'Nieprzypisany';
+    if (dutyDateRangeEl) dutyDateRangeEl.textContent = `Obecny Tydzień (${currentWeekItem.startDate || '---'})`;
+
+    if (scheduleListEl) {
+        scheduleListEl.innerHTML = trashSchedule.map((item, idx) => `
+            <div class="trash-schedule-item ${idx === 0 ? 'current-week' : ''}">
+                <span class="trash-week-label">${idx === 0 ? '👉 Tydzień 1 (Obecny)' : `Tydzień ${idx + 1}`} (${item.startDate || '---'})</span>
+                <span class="trash-person-name">🧹 ${item.worker}</span>
+            </div>
+        `).join('');
+    }
+
+    if (randomizeBtn) {
+        randomizeBtn.onclick = async () => {
+            const confirmed = await showConfirm("Czy chcesz wylosować nowy grafik wywozu śmieci na najbliższe 4 tygodnie?", "LOSUJ", "ANULUJ", false);
+            if (confirmed) {
+                const shuffled = [...defaultWorkers].sort(() => Math.random() - 0.5);
+                const now = new Date();
+                const newSchedule = [0, 1, 2, 3].map(i => {
+                    const startDate = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+                    const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
+                    return {
+                        weekIndex: i,
+                        worker: shuffled[i % shuffled.length],
+                        startDate: startDate.toISOString().split('T')[0],
+                        endDate: endDate.toISOString().split('T')[0]
+                    };
+                });
+                try {
+                    await setDoc(doc(db, 'settings', 'trash_schedule_doc'), {
+                        schedule: newSchedule,
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: currentUser
+                    });
+                    trashSchedule = newSchedule;
+                    renderTrashSchedule();
+                    showToast("Wylosowano nowy grafik śmieci!", "success");
+                    logAction(`Wylosowano nowy grafik śmieci przez ${currentUser}`);
+                } catch (e) { showToast("Błąd zapisu grafiku", "error"); }
+            }
+        };
+    }
+}
+
+// Account Creation Logic for Tomek & Admin
+function setupAccountCreation() {
+    const accountBox = document.getElementById('account-creation-box');
+    const form = document.getElementById('create-account-form');
+    if (!accountBox || !form) return;
+
+    if (canManageLocationsAndUsers(currentUser)) {
+        accountBox.style.display = 'block';
+    } else {
+        accountBox.style.display = 'none';
+    }
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('new-acc-username').value.trim();
+        const role = document.getElementById('new-acc-role').value;
+        const password = document.getElementById('new-acc-password').value.trim();
+
+        if (!username || !password) {
+            showToast("Wypełnij wszystkie pola konta!", "error");
+            return;
+        }
+
+        const canonical = username.toLowerCase();
+        try {
+            await setDoc(doc(db, 'users', canonical), {
+                username: username,
+                role: role,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser
+            });
+            await setDoc(doc(db, 'settings', canonical + '_pass'), {
+                password: password,
+                updatedAt: new Date().toISOString(),
+                updatedBy: currentUser
+            });
+            showToast(`Stworzono nowe konto: ${username} (${role === 'owner' ? 'Właściciel' : 'Pracownik'})!`, "success");
+            logAction(`${currentUser} stworzył konto użytkownika: ${username}`);
+            form.reset();
+            populateWorkerSelects();
+            loadAdminData();
+        } catch (err) {
+            showToast("Błąd tworzenia konta", "error");
+        }
+    };
 }
 
 // Toggle Task Completion & Send Notification to Owners
@@ -1369,10 +1825,72 @@ function openReportModal(id) {
 }
 
 async function loadAdminData() {
-    const updateStatusCard = async (userId, cardId) => {
+    const usersStatusGrid = document.getElementById('users-status-grid');
+    if (!usersStatusGrid) return;
+
+    const defaultUsersList = [
+        { id: 'admin', name: 'Admin', role: 'Właściciel / System' },
+        { id: 'tomek', name: 'Tomek', role: 'Właściciel' },
+        { id: 'monia', name: 'Monia', role: 'Właściciel' },
+        { id: 'adam', name: 'Adam', role: 'Pracownik' },
+        { id: 'michal', name: 'Michał', role: 'Pracownik' },
+        { id: 'lukasz', name: 'Łukasz', role: 'Pracownik' },
+        { id: 'nastka', name: 'Nastka', role: 'Pracownik' }
+    ];
+
+    const allUsersMap = new Map();
+    defaultUsersList.forEach(u => allUsersMap.set(u.id, u));
+    customUsers.forEach(u => {
+        const canonical = (u.username || u.id).toLowerCase();
+        if (!allUsersMap.has(canonical)) {
+            allUsersMap.set(canonical, {
+                id: canonical,
+                name: u.username || canonical,
+                role: u.role === 'owner' ? 'Właściciel' : 'Pracownik',
+                isCustom: true
+            });
+        }
+    });
+
+    const allUsers = Array.from(allUsersMap.values());
+
+    usersStatusGrid.innerHTML = allUsers.map(u => `
+        <div class="user-status-card glass" id="status-${u.id}">
+            <div class="user-avatar">${u.name.charAt(0).toUpperCase()}</div>
+            <div class="user-info" style="width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h4>${u.name} <span style="font-size:0.75rem; color:var(--text-muted);">(${u.role})</span></h4>
+                    ${u.isCustom ? `<button class="btn-icon btn-delete-custom-user" data-username="${u.id}" title="Usuń konto" style="color:#ef4444;">&times;</button>` : ''}
+                </div>
+                <div class="status-indicator">
+                    <span>Checking...</span>
+                </div>
+                <p class="last-login">Ostatnie logowanie: <span class="time">Nigdy</span></p>
+            </div>
+        </div>
+    `).join('');
+
+    usersStatusGrid.querySelectorAll('.btn-delete-custom-user').forEach(btn => {
+        btn.onclick = async () => {
+            const uId = btn.dataset.username;
+            const confirmed = await showConfirm(`Czy na pewno chcesz usunąć konto użytkownika ${uId}?`, "USUŃ KONTO", "ANULUJ", true);
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(db, 'users', uId));
+                    await deleteDoc(doc(db, 'settings', uId + '_pass'));
+                    showToast(`Usunięto konto: ${uId}`, "success");
+                    logAction(`${currentUser} usunął konto użytkownika: ${uId}`);
+                    loadAdminData();
+                } catch (e) { showToast("Błąd usuwania konta", "error"); }
+            }
+        };
+    });
+
+    const updateStatusCard = async (uObj) => {
+        const userId = uObj.id;
         const docRef = doc(db, 'settings', userId + '_login');
         const d = await getDoc(docRef);
-        const card = document.getElementById(cardId);
+        const card = document.getElementById('status-' + userId);
         if (!card) return;
 
         const timeEl = card.querySelector('.time');
@@ -1390,6 +1908,9 @@ async function loadAdminData() {
                 statusEl.textContent = 'Offline';
                 statusEl.className = 'offline';
             }
+        } else {
+            statusEl.textContent = 'Brak danych';
+            statusEl.className = 'offline';
         }
 
         const lockRef = doc(db, 'settings', userId + '_lock');
@@ -1488,9 +2009,8 @@ async function loadAdminData() {
         }
     };
 
-    const userIds = ['admin', 'tomek', 'monia', 'adam', 'michal', 'lukasz', 'nastka'];
-    for (const userId of userIds) {
-        await updateStatusCard(userId, 'status-' + userId);
+    for (const uObj of allUsers) {
+        await updateStatusCard(uObj);
     }
 
     const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));

@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EcoCarPro | Zarządzanie Samochodami</title>
+    <title>EcoCarPro | Zarządzanie Flotą i Serwisem</title>
     <meta name="description"
-        content="EcoCarPro - Profesjonalny system zarządzania flotą i serwisem samochodowym. Monitoruj ceny, właścicieli i historię napraw w eleganckim wydaniu.">
+        content="EcoCarPro - Profesjonalny system zarządzania flotą, stacjami roboczymi, kalendarzem i serwisem samochodowym.">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#10b981">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,13 +31,13 @@
             </div>
             <div class="form-group">
                 <label>Użytkownik</label>
-                <input type="text" id="login-user" placeholder="Użytkownik">
+                <input type="text" id="login-user" placeholder="Nazwa użytkownika">
             </div>
             <div class="form-group">
                 <label>Hasło</label>
                 <input type="password" id="login-password" placeholder="Wpisz hasło">
             </div>
-            <button id="login-btn" class="btn-primary" style="width: 100%">Zaloguj</button>
+            <button id="login-btn" class="btn-primary" style="width: 100%">Zaloguj się</button>
             <div id="locked-msg" style="display: none;"></div>
         </div>
     </div>
@@ -103,7 +103,10 @@
                 <div class="view-tabs-container">
                     <div class="view-tabs">
                         <button id="view-active" class="tab-btn active">🏎️ Aktywne</button>
+                        <button id="view-locations" class="tab-btn">📍 Miejsce</button>
                         <button id="view-calendar" class="tab-btn">📅 Kalendarz</button>
+                        <button id="view-notes" class="tab-btn">📝 Notatki</button>
+                        <button id="view-trash" class="tab-btn">🗑️ Śmieci</button>
                         <button id="view-archive" class="tab-btn">📦 Archiwum</button>
                         <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
                     </div>
@@ -154,6 +157,163 @@
                 </div>
             </div>
 
+            <!-- Locations Section (Stacje Robocze: Carport, Hala Główna, Hala Mała, Myjnia, Konserwacja) -->
+            <div id="locations-section" class="locations-section" style="display: none;">
+                <div class="section-title-bar glass">
+                    <h2>📍 Stacje Robocze / Miejsca na Hali</h2>
+                    <p class="subtitle">Zarządzaj lokalizacją samochodów na terenie serwisu (Przenosić mogą tylko Tomek i Admin)</p>
+                </div>
+
+                <div class="locations-grid">
+                    <!-- Station 1: Carport -->
+                    <div class="location-card glass" data-station="Carport">
+                        <div class="loc-card-header">
+                            <h3>🚗 Carport</h3>
+                            <span class="loc-count-badge">0 aut</span>
+                        </div>
+                        <div class="loc-cars-container">
+                            <!-- Cars listed here -->
+                        </div>
+                        <div class="loc-admin-controls" style="display: none;">
+                            <select class="form-select loc-assign-select">
+                                <option value="">+ Ustaw auto w Carport...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Station 2: Hala Główna -->
+                    <div class="location-card glass" data-station="Hala Główna">
+                        <div class="loc-card-header">
+                            <h3>🏢 Hala Główna</h3>
+                            <span class="loc-count-badge">0 aut</span>
+                        </div>
+                        <div class="loc-cars-container">
+                            <!-- Cars listed here -->
+                        </div>
+                        <div class="loc-admin-controls" style="display: none;">
+                            <select class="form-select loc-assign-select">
+                                <option value="">+ Ustaw auto w Hali Głównej...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Station 3: Hala Mała -->
+                    <div class="location-card glass" data-station="Hala Mała">
+                        <div class="loc-card-header">
+                            <h3>🏬 Hala Mała</h3>
+                            <span class="loc-count-badge">0 aut</span>
+                        </div>
+                        <div class="loc-cars-container">
+                            <!-- Cars listed here -->
+                        </div>
+                        <div class="loc-admin-controls" style="display: none;">
+                            <select class="form-select loc-assign-select">
+                                <option value="">+ Ustaw auto w Hali Małej...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Station 4: Myjnia -->
+                    <div class="location-card glass" data-station="Myjnia">
+                        <div class="loc-card-header">
+                            <h3>🚿 Myjnia</h3>
+                            <span class="loc-count-badge">0 aut</span>
+                        </div>
+                        <div class="loc-cars-container">
+                            <!-- Cars listed here -->
+                        </div>
+                        <div class="loc-admin-controls" style="display: none;">
+                            <select class="form-select loc-assign-select">
+                                <option value="">+ Ustaw auto na Myjni...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Station 5: Konserwacja -->
+                    <div class="location-card glass" data-station="Konserwacja">
+                        <div class="loc-card-header">
+                            <h3>🛡️ Konserwacja</h3>
+                            <span class="loc-count-badge">0 aut</span>
+                        </div>
+                        <div class="loc-cars-container">
+                            <!-- Cars listed here -->
+                        </div>
+                        <div class="loc-admin-controls" style="display: none;">
+                            <select class="form-select loc-assign-select">
+                                <option value="">+ Ustaw auto w Konserwacji...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div id="notes-section" class="notes-section" style="display: none;">
+                <div class="section-title-bar glass" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2>📝 Notatki i Uwagi Warsztatowe</h2>
+                        <p class="subtitle">Twórz notatki, nadawaj priorytety i dziel się ustaleniami</p>
+                    </div>
+                    <button id="btn-toggle-new-note-form" class="btn-primary">➕ Nowa Notatka</button>
+                </div>
+
+                <!-- Create Note Form Box -->
+                <div id="new-note-form-box" class="glass-box" style="display: none; margin-bottom: 20px;">
+                    <h3>✍️ Dodaj nową notatkę</h3>
+                    <form id="note-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                        <textarea id="note-content" rows="3" placeholder="Wpisz treść notatki, uwagi do auta, zamówienia części..." required></textarea>
+                        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                            <label class="checkbox-container priority-toggle">
+                                <input type="checkbox" id="note-priority">
+                                <span class="checkmark priority-checkmark"></span>
+                                ⚡ Wysoki Priorytet
+                            </label>
+                            <select id="note-car-select" class="form-select" style="max-width: 250px;">
+                                <option value="">-- Powiąż z autem (opcjonalnie) --</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button type="button" id="btn-cancel-note" class="btn-secondary">Anuluj</button>
+                            <button type="submit" class="btn-primary">Zapisz Notatkę</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Active Notes Grid -->
+                <div id="notes-grid" class="notes-grid">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+
+            <!-- Trash Duty Section -->
+            <div id="trash-section" class="trash-section" style="display: none;">
+                <div class="section-title-bar glass">
+                    <h2>🗑️ Grafik Wywozu Śmieci</h2>
+                    <p class="subtitle">Harmonogram tygodniowy wyrzucania śmieci na warsztacie</p>
+                </div>
+
+                <div class="trash-duty-hero glass">
+                    <div class="duty-badge">W tym tygodniu śmieci wyrzuca:</div>
+                    <div class="duty-person-box">
+                        <div id="trash-duty-avatar" class="user-avatar mega-avatar">?</div>
+                        <div class="duty-person-info">
+                            <h2 id="trash-duty-name">Nieprzypisany</h2>
+                            <span id="trash-duty-date-range" class="duty-date">Obecny Tydzień</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trash-roster-box glass">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h3>📅 Harmonogram na ten miesiąc</h3>
+                        <button id="btn-randomize-trash" class="btn-secondary manager-only" style="display: none;">🎲 Wygłosuj / Losuj Nowy Grafik</button>
+                    </div>
+                    <div id="trash-schedule-list" class="trash-schedule-list">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Calendar Section -->
             <div id="calendar-section" class="calendar-section glass" style="display: none;">
                 <div class="calendar-header">
@@ -180,66 +340,42 @@
 
             <!-- Admin Section -->
             <div id="admin-section" class="admin-section" style="display: none;">
-                <div class="users-status-grid">
-                    <div id="status-admin" class="user-status-card glass">
-                        <div class="user-avatar" style="background: #ef4444;">A</div>
-                        <div class="user-info">
-                            <h3>Administrator</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                <!-- Account Creation Box for Tomek & Admin -->
+                <div id="account-creation-box" class="glass-box manager-only" style="margin-bottom: 20px; display: none;">
+                    <h3>➕ Tworzenie Nowego Konta Użytkownika</h3>
+                    <form id="create-account-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; align-items: end;">
+                        <div class="form-group">
+                            <label for="new-acc-username">Nazwa Użytkownika / Login</label>
+                            <input type="text" id="new-acc-username" placeholder="np. Piotr" required>
                         </div>
-                    </div>
-                    <div id="status-tomek" class="user-status-card glass">
-                        <div class="user-avatar">T</div>
-                        <div class="user-info">
-                            <h3>Tomasz</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        <div class="form-group">
+                            <label for="new-acc-role">Rola w Systemie</label>
+                            <select id="new-acc-role" class="form-select" required>
+                                <option value="worker">Pracownik</option>
+                                <option value="owner">Właściciel / Zarząd</option>
+                            </select>
                         </div>
-                    </div>
-                    <div id="status-monia" class="user-status-card glass">
-                        <div class="user-avatar">M</div>
-                        <div class="user-info">
-                            <h3>Monika</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
+                        <div class="form-group">
+                            <label for="new-acc-password">Hasło do Konta</label>
+                            <input type="text" id="new-acc-password" placeholder="Hasło" required>
                         </div>
-                    </div>
-                    <div id="status-adam" class="user-status-card glass">
-                        <div class="user-avatar">A</div>
-                        <div class="user-info">
-                            <h3>Adam</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                        </div>
-                    </div>
-                    <div id="status-michal" class="user-status-card glass">
-                        <div class="user-avatar">M</div>
-                        <div class="user-info">
-                            <h3>Michał</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                        </div>
-                    </div>
-                    <div id="status-lukasz" class="user-status-card glass">
-                        <div class="user-avatar">Ł</div>
-                        <div class="user-info">
-                            <h3>Łukasz</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                        </div>
-                    </div>
-                    <div id="status-nastka" class="user-status-card glass">
-                        <div class="user-avatar">N</div>
-                        <div class="user-info">
-                            <h3>Nastka</h3>
-                            <p class="status-indicator">Status: <span class="offline">Offline</span></p>
-                            <p class="last-login">Ostatnie logowanie: <span class="time">---</span></p>
-                        </div>
+                        <button type="submit" class="btn-primary" style="height: 42px;">Stwórz Konto</button>
+                    </form>
+                </div>
+
+                <div class="users-status-grid" id="users-status-grid">
+                    <!-- User status cards injected dynamically -->
+                </div>
+
+                <!-- Permanent Notes Archive for Admin/Tomek -->
+                <div class="glass-box manager-only" style="margin-top: 25px; display: none;">
+                    <h3>📜 Trwałe Archiwum Notatek (Wszystkie usunięte notatki)</h3>
+                    <div id="archived-notes-list" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+                        <!-- Injected dynamically -->
                     </div>
                 </div>
 
-                <div class="logs-container glass">
+                <div class="logs-container glass" style="margin-top: 25px;">
                     <div class="logs-header">
                         <h3>📋 Ostatnie działania (Wszyscy Użytkownicy)</h3>
                         <span class="info-tag">Logi systemowe</span>
@@ -257,9 +393,21 @@
                 <span class="mob-icon">🏎️</span>
                 <span class="mob-label">Aktywne</span>
             </button>
+            <button id="mob-nav-locations" class="mob-nav-item">
+                <span class="mob-icon">📍</span>
+                <span class="mob-label">Miejsce</span>
+            </button>
             <button id="mob-nav-calendar" class="mob-nav-item">
                 <span class="mob-icon">📅</span>
                 <span class="mob-label">Kalendarz</span>
+            </button>
+            <button id="mob-nav-notes" class="mob-nav-item">
+                <span class="mob-icon">📝</span>
+                <span class="mob-label">Notatki</span>
+            </button>
+            <button id="mob-nav-trash" class="mob-nav-item">
+                <span class="mob-icon">🗑️</span>
+                <span class="mob-label">Śmieci</span>
             </button>
             <button id="mob-nav-archive" class="mob-nav-item">
                 <span class="mob-icon">📦</span>
@@ -319,10 +467,6 @@
                             <input type="date" id="car-pickup-date">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="car-history">Uwagi i Opis Zlecenia</label>
-                        <textarea id="car-history" placeholder="Dodatkowe uwagi, życzenia klienta..." rows="3"></textarea>
-                    </div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="car-service-name">Główna Usługa (własny wpis):</label>
@@ -341,14 +485,24 @@
                             <label for="car-worker">Przypisz Pracownika</label>
                             <select id="car-worker" class="form-select">
                                 <option value="">Wybierz pracownika...</option>
-                                <option value="Adam">Adam</option>
-                                <option value="Łukasz">Łukasz</option>
-                                <option value="Michał">Michał</option>
-                                <option value="Nastka">Nastka</option>
-                                <option value="Tomasz">Tomasz</option>
-                                <option value="Monika">Monika</option>
+                                <!-- Injected dynamically -->
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="car-location">Stacja / Miejsce na Hali:</label>
+                            <select id="car-location" class="form-select">
+                                <option value="Brak">Brak (Nieprzypisane)</option>
+                                <option value="Carport">Carport</option>
+                                <option value="Hala Główna">Hala Główna</option>
+                                <option value="Hala Mała">Hala Mała</option>
+                                <option value="Myjnia">Myjnia</option>
+                                <option value="Konserwacja">Konserwacja</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="car-history">Uwagi i Opis Zlecenia</label>
+                        <textarea id="car-history" placeholder="Dodatkowe uwagi, życzenia klienta..." rows="3"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Zadania Do Zrobienia:</label>
@@ -561,7 +715,7 @@
                     <p>Wszelkie prawa są zastrzeżone.</p>
                     <hr>
                     <p><strong>Kontakt & Wsparcie:</strong></p>
-                    <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chrom@gmail.com</a></p>
+                    <p>📧 <a href="mailto:adrian.chrom@gmail.com">adrian.chromiańczuk@gmail.com</a></p>
                     <p>📞 <a href="tel:+48605595049">605 595 049</a></p>
                 </div>
             </div>
