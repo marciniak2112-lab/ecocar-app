@@ -103,10 +103,12 @@ async function getUserPassword(username) {
     };
 
     try {
-        const delDoc = await fetchDocWithTimeout(doc(db, 'deleted_users', canonical));
-        if (delDoc.exists()) {
-            if (!deletedUsers.includes(canonical)) deletedUsers.push(canonical);
-            return null;
+        if (deletedUsers.length === 0) {
+            const delDoc = await fetchDocWithTimeout(doc(db, 'deleted_users', canonical));
+            if (delDoc.exists()) {
+                if (!deletedUsers.includes(canonical)) deletedUsers.push(canonical);
+                return null;
+            }
         }
 
         let passDoc = await fetchDocWithTimeout(doc(db, 'settings', canonical + '_pass'));
@@ -1603,6 +1605,41 @@ function renderLocations() {
         const card = locationsSection.querySelector(`.location-card[data-station="${station}"]`);
         if (!card) return;
 
+        // Setup drop target listeners once per card
+        if (!card.dataset.dropTargetInit) {
+            card.dataset.dropTargetInit = 'true';
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                card.classList.add('drag-over');
+            });
+            card.addEventListener('dragleave', (e) => {
+                if (!card.contains(e.relatedTarget)) {
+                    card.classList.remove('drag-over');
+                }
+            });
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                card.classList.remove('drag-over');
+                const carId = e.dataTransfer.getData('text/plain') || window.currentDraggedCarId;
+                const fromStation = e.dataTransfer.getData('source-station') || window.currentDraggedFromStation;
+                if (!carId) return;
+                if (fromStation === station) return;
+
+                const targetCar = cars.find(c => c.id === carId);
+                const carLabel = targetCar ? targetCar.brand : 'Pojazd';
+
+                try {
+                    await updateDoc(doc(db, 'cars', carId), { location: station });
+                    showToast(`Przeniesiono ${carLabel} do stacji: ${station}`, "success");
+                    logAction(`${currentUser} przeniósł pojazd ${carLabel} ze stacji ${fromStation || 'Brak'} do: ${station}`);
+                } catch (err) {
+                    console.error("Błąd przenoszenia auta:", err);
+                    showToast("Błąd przenoszenia pojazdu", "error");
+                }
+            });
+        }
+
         const carsContainer = card.querySelector('.loc-cars-container');
         const countBadge = card.querySelector('.loc-count-badge');
         const adminControls = card.querySelector('.loc-admin-controls');
@@ -1612,20 +1649,55 @@ function renderLocations() {
         countBadge.textContent = `${stationCars.length} aut`;
 
         if (stationCars.length === 0) {
-            carsContainer.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px;">Brak aut w tej stacji.</p>';
+            carsContainer.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px; pointer-events:none;">Brak aut w tej stacji.<br><span style="font-size:0.72rem; opacity:0.7;">Przeciągnij tutaj auto</span></p>';
         } else {
             carsContainer.innerHTML = stationCars.map(car => `
-                <div class="loc-car-chip">
-                    <div>
-                        <div class="car-name">${car.brand}</div>
-                        <div class="car-worker-tag">${car.plateNum ? car.plateNum + ' | ' : ''}Pracownicy: ${getCarWorkerDisplay(car)}</div>
+                <div class="loc-car-chip" draggable="true" data-car-id="${car.id}" data-station="${station}">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="loc-drag-handle" title="Przeciągnij do innej stacji">⋮⋮</span>
+                        <div>
+                            <div class="car-name">${car.brand}</div>
+                            <div class="car-worker-tag">${car.plateNum ? car.plateNum + ' | ' : ''}Pracownicy: ${getCarWorkerDisplay(car)}</div>
+                        </div>
                     </div>
-                    ${isManager ? `
-                        <button class="loc-remove-btn" data-car-id="${car.id}" title="Usuń z tej stacji">&times;</button>
-                    ` : ''}
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <button class="loc-quick-move-btn" data-car-id="${car.id}" data-station="${station}" title="Przenieś do innej hali (⇄)">⇄</button>
+                        ${isManager ? `
+                            <button class="loc-remove-btn" data-car-id="${car.id}" title="Usuń z tej stacji">&times;</button>
+                        ` : ''}
+                    </div>
                 </div>
             `).join('');
         }
+
+        // Attach drag handlers to chips
+        carsContainer.querySelectorAll('.loc-car-chip').forEach(chip => {
+            chip.addEventListener('dragstart', (e) => {
+                const carId = chip.dataset.carId;
+                const srcStation = chip.dataset.station;
+                e.dataTransfer.setData('text/plain', carId);
+                e.dataTransfer.setData('source-station', srcStation);
+                e.dataTransfer.effectAllowed = 'move';
+                chip.classList.add('dragging');
+                window.currentDraggedCarId = carId;
+                window.currentDraggedFromStation = srcStation;
+            });
+
+            chip.addEventListener('dragend', () => {
+                chip.classList.remove('dragging');
+                window.currentDraggedCarId = null;
+                window.currentDraggedFromStation = null;
+                document.querySelectorAll('.location-card.drag-over').forEach(el => el.classList.remove('drag-over'));
+            });
+        });
+
+        // Attach quick move handler
+        carsContainer.querySelectorAll('.loc-quick-move-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                openStationPicker(btn.dataset.carId, btn.dataset.station);
+            };
+        });
 
         if (isManager) {
             adminControls.style.display = 'block';
@@ -1656,6 +1728,63 @@ function renderLocations() {
                 } catch (e) { showToast("Błąd", "error"); }
             };
         });
+    });
+}
+
+function openStationPicker(carId, currentStation) {
+    const targetCar = cars.find(c => c.id === carId);
+    if (!targetCar) return;
+
+    document.getElementById('station-picker-modal')?.remove();
+
+    const stations = ['Carport', 'Hala Główna', 'Hala Mała', 'Myjnia', 'Konserwacja'];
+    const modal = document.createElement('div');
+    modal.id = 'station-picker-modal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:10000; padding:20px;';
+    
+    modal.innerHTML = `
+        <div class="glass" style="max-width:380px; width:100%; padding:20px; border-radius:16px; background:#1e293b; border:1px solid rgba(255,255,255,0.15); box-shadow:0 12px 36px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h4 style="margin:0; font-size:1.05rem; color:#fff;">📍 Przenieś pojazd</h4>
+                <button id="close-station-picker" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <p style="margin:0 0 14px 0; font-size:0.85rem; color:var(--text-muted);">
+                <strong style="color:#fff;">${targetCar.brand}</strong> ${targetCar.plateNum ? '(' + targetCar.plateNum + ')' : ''}<br>
+                Aktualnie: <span style="color:var(--primary-green); font-weight:600;">${currentStation || 'Brak'}</span>
+            </p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                ${stations.map(st => `
+                    <button class="station-target-btn" data-st="${st}" style="padding:10px 14px; text-align:left; background:${st === currentStation ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'}; border:1px solid ${st === currentStation ? 'var(--primary-green)' : 'rgba(255,255,255,0.1)'}; color:#fff; border-radius:8px; font-weight:500; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:background 0.2s;">
+                        <span>${st}</span>
+                        ${st === currentStation ? '<span style="font-size:0.75rem; color:var(--primary-green);">Aktualna</span>' : '<span style="font-size:0.8rem; color:var(--text-muted);">Wybierz →</span>'}
+                    </button>
+                `).join('')}
+                <button class="station-target-btn" data-st="Brak" style="padding:10px 14px; text-align:left; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#ef4444; border-radius:8px; font-weight:500; cursor:pointer; margin-top:4px;">
+                    🚫 Usuń ze stacji (Brak lokalizacji)
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#close-station-picker').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+    modal.querySelectorAll('.station-target-btn').forEach(btn => {
+        btn.onclick = async () => {
+            const chosenStation = btn.dataset.st;
+            modal.remove();
+            if (chosenStation === currentStation) return;
+            try {
+                await updateDoc(doc(db, 'cars', carId), { location: chosenStation });
+                showToast(chosenStation === 'Brak' ? 'Usunięto pojazd ze stacji roboczej.' : `Przeniesiono pojazd do: ${chosenStation}`, "success");
+                logAction(`${currentUser} przeniósł pojazd ${targetCar.brand} z ${currentStation || 'brak'} do: ${chosenStation}`);
+            } catch (err) {
+                console.error("Błąd przenoszenia:", err);
+                showToast("Błąd zmiany stacji", "error");
+            }
+        };
     });
 }
 
@@ -2761,7 +2890,15 @@ async function loadAdminData() {
         const userId = uObj.id;
         const userName = uObj.name;
         const docRef = doc(db, 'settings', userId + '_login');
-        const d = await getDoc(docRef);
+        const lockRef = doc(db, 'settings', userId + '_lock');
+
+        // Parallelize fetching login status, lock state, and password
+        const [d, lockSnap, pass] = await Promise.all([
+            getDoc(docRef),
+            getDoc(lockRef),
+            getUserPassword(userId)
+        ]);
+
         const card = document.getElementById('status-' + userId);
         if (!card) return;
 
@@ -2785,8 +2922,6 @@ async function loadAdminData() {
             statusEl.className = 'offline';
         }
 
-        const lockRef = doc(db, 'settings', userId + '_lock');
-        const lockSnap = await getDoc(lockRef);
         const isLocked = lockSnap.exists() && lockSnap.data().locked;
 
         const userInfoEl = card.querySelector('.user-info');
@@ -2816,7 +2951,6 @@ async function loadAdminData() {
         };
         userInfoEl.appendChild(actionBtn);
 
-        const pass = await getUserPassword(userId);
         if (pass) {
             const existingPass = card.querySelector('.pass-preview');
             if (existingPass) existingPass.remove();
@@ -2902,12 +3036,11 @@ async function loadAdminData() {
         }
     };
 
-    for (const uObj of activeUsers) {
-        await updateStatusCard(uObj);
-    }
-
     const logsQ = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(50));
-    const logsSnap = await getDocs(logsQ);
+    const [_, logsSnap] = await Promise.all([
+        Promise.all(activeUsers.map(u => updateStatusCard(u))),
+        getDocs(logsQ)
+    ]);
 
     logsList.innerHTML = logsSnap.docs.map(doc => {
         const log = doc.data();
