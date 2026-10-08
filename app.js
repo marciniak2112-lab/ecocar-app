@@ -215,6 +215,13 @@ function canManageLocationsAndUsers(user = currentUser) {
     return u === 'admin' || u === 'tomek' || u === 'tomasz';
 }
 
+// Helper: Check if user can view Zrealizowane / Archive tab (Owners & Łukasz)
+function canSeeArchive(user = currentUser) {
+    if (!user) return false;
+    const u = user.toLowerCase();
+    return isOwner(u) || u === 'lukasz' || u === 'łukasz';
+}
+
 // DOM Elements
 const carsGrid = document.getElementById('cars-grid');
 const calendarSection = document.getElementById('calendar-section');
@@ -474,6 +481,10 @@ function setupNavigation() {
     const switchTab = (targetView) => {
         if (targetView === 'admin' && !canManageLocationsAndUsers(currentUser)) {
             showToast("Panel administratora dostępny jest tylko dla Admina i Tomka.", "error");
+            return;
+        }
+        if (targetView === 'archive' && !canSeeArchive(currentUser)) {
+            showToast("Brak uprawnień do zakładki Zrealizowane.", "error");
             return;
         }
         currentView = targetView;
@@ -843,8 +854,9 @@ function updateUIForRole() {
     const owner = isOwner(currentUser);
     const canManage = canManageLocationsAndUsers(currentUser);
 
-    // Archive access: Only Owners (Admin, Tomek, Monia) can see Archive tab!
-    if (owner) {
+    // Archive access: Only Owners (Admin, Tomek, Monia) & Łukasz can see Archive tab!
+    const archiveAccess = canSeeArchive(currentUser);
+    if (archiveAccess) {
         if (viewArchiveBtn) viewArchiveBtn.style.display = 'block';
         if (mobNavArchive) mobNavArchive.style.display = 'flex';
     } else {
@@ -876,7 +888,7 @@ function updateUIForRole() {
         document.body.classList.remove('worker-hide-prices');
     }
 
-    // Hide price group in car form modal for workers
+    // Hide price and phone groups in car form modal for workers
     const priceInput = document.getElementById('car-price');
     if (priceInput) {
         const priceGroup = priceInput.closest('.form-group');
@@ -885,12 +897,20 @@ function updateUIForRole() {
         }
     }
 
-    // Admin, Tomek & Łukasz (Kierownik) access to Adding Cars
+    const phoneInput = document.getElementById('car-owner-phone');
+    if (phoneInput) {
+        const phoneGroup = phoneInput.closest('.form-group');
+        if (phoneGroup) {
+            phoneGroup.style.display = owner ? 'block' : 'none';
+        }
+    }
+
+    // Admin, Tomek & Łukasz access to Adding Cars
     if (addCarBtn) {
         addCarBtn.style.display = canAddCars(currentUser) ? 'inline-flex' : 'none';
     }
 
-    // Admin & Tomek & Łukasz access to Admin Panel
+    // Admin & Tomek access to Admin Panel
     if (canManage) {
         if (viewAdminBtn) viewAdminBtn.style.display = 'block';
         if (mobNavAdmin) mobNavAdmin.style.display = 'flex';
@@ -1360,45 +1380,58 @@ function renderCars(filter = '') {
 }
 
 function renderArchiveRows(filteredCars) {
+    const isOwnerUser = isOwner(currentUser);
     const sorted = [...filteredCars].sort((a, b) => new Date(b.statusChangeDate || b.dateAdded) - new Date(a.statusChangeDate || b.dateAdded));
 
     const totalArchiveValue = filteredCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
-    archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
-    archiveTotalValueEl.parentElement.classList.add('price-blur-target');
+    if (archiveTotalValueEl) {
+        archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
+    }
+    const archiveStatsEl = document.querySelector('.archive-stats');
+    if (archiveStatsEl) {
+        archiveStatsEl.style.display = isOwnerUser ? 'flex' : 'none';
+    }
 
     let html = `
         <div class="archive-container">
             <div class="archive-header glass">
-                <span class="col owner">Właściciel / Tel</span>
+                ${isOwnerUser ? '<span class="col owner">Właściciel / Tel</span>' : ''}
                 <span class="col brand">Marka i Model</span>
                 <span class="col plates">Tablice</span>
-                <span class="col date">Data wydania</span>
-                ${currentUser === 'Admin' ? '<span class="col actions">Akcje</span>' : ''}
+                ${!isOwnerUser ? '<span class="col tasks">Co było robione</span>' : ''}
+                <span class="col date">Data realizacji</span>
+                ${isOwnerUser ? '<span class="col actions">Akcje</span>' : ''}
             </div>
             <div class="archive-list">
     `;
 
     sorted.forEach(car => {
         const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : '---';
+        const tasksList = (car.todoTasks || car.todo || []).map(t => typeof t === 'string' ? t : t.text).filter(Boolean);
+        const servicesDoneText = tasksList.length > 0 ? tasksList.join(', ') : (car.serviceName || 'Brak wpisanych zadań');
+
         html += `
             <div class="archive-row glass" data-id="${car.id}">
-                <span class="col owner">${car.ownerName || '---'} / ${car.ownerPhone}</span>
-                <span class="col brand">${car.brand}</span>
+                ${isOwnerUser ? `<span class="col owner">${car.ownerName || '---'} / ${car.ownerPhone || '---'}</span>` : ''}
+                <span class="col brand" style="font-weight:600;">${car.brand}</span>
                 <span class="col plates">${car.plateNum || '---'}</span>
-                <span class="col date">${releaseDate}</span>
+                ${!isOwnerUser ? `<span class="col tasks">${servicesDoneText}</span>` : ''}
+                <span class="col date">${isOwnerUser ? releaseDate : '📅 ' + releaseDate}</span>
+                ${isOwnerUser ? `
                 <span class="col actions">
                     <button class="btn-icon btn-report" data-id="${car.id}" title="Pobierz Raport">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     </button>
-                ${currentUser === 'Admin' ? `
+                    ${currentUser === 'Admin' ? `
                     <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
                     <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
-                ` : ''}
+                    ` : ''}
                 </span>
+                ` : ''}
             </div>
         `;
     });
@@ -1415,9 +1448,6 @@ function renderActiveGrid(filteredCars) {
 
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
-    const isWorkerRole = !isOwner(currentUser) && currentUser !== '';
-    const isAssignedToMe = isCarAssignedToWorker(car, currentUser) || (car.addedBy && currentUser && car.addedBy.toLowerCase() === currentUser.toLowerCase());
-    const isOtherWorkerCar = isWorkerRole && !isAssignedToMe;
     
     // Normalize todo items into task objects
     let tasks = [];
@@ -1425,24 +1455,6 @@ function generateCarCardHtml(car) {
         tasks = car.todoTasks;
     } else if (car.todo && Array.isArray(car.todo)) {
         tasks = car.todo.map(t => typeof t === 'string' ? { text: t, done: false } : t);
-    }
-
-    if (isOtherWorkerCar) {
-        // Greyed-out minimal view for other worker's car
-        return `
-            <div class="car-card worker-other ${car.priority ? 'priority-high' : ''} ${status === 'gotowe' ? 'status-gotowe' : ''}" data-id="${car.id}">
-                <div class="dates-row">
-                    <span class="worker-other-badge">👤 Przypisany: ${getCarWorkerDisplay(car)}</span>
-                    ${car.location ? `<span class="location-badge" style="font-size:0.75rem; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">📍 ${car.location}</span>` : ''}
-                </div>
-                <h3 style="margin-top:8px;">${car.brand}</h3>
-                ${car.plateNum ? `<div class="car-info-row" style="color: var(--text-muted); font-size: 0.8rem;">📌 ${car.plateNum}</div>` : ''}
-                <div class="car-info-row" style="font-size:0.8rem; margin-top:6px;">
-                    <span class="label">Status:</span>
-                    <span class="val">${status}</span>
-                </div>
-            </div>
-        `;
     }
 
     // Full / Collapsible Card View
@@ -1476,7 +1488,7 @@ function generateCarCardHtml(car) {
                 ` : ''}
                 <div class="car-info-row">
                     <span class="label">Właściciel Auta</span>
-                    <span class="val">${car.ownerName || '---'} ${car.ownerPhone ? '/ ' + car.ownerPhone : ''}</span>
+                    <span class="val">${car.ownerName || '---'}${isOwner(currentUser) && car.ownerPhone ? ' / ' + car.ownerPhone : ''}</span>
                 </div>
                 <div class="car-info-row">
                     <span class="label">Pracownik(owie)</span>
@@ -1511,13 +1523,13 @@ function generateCarCardHtml(car) {
                 </div>
 
                 <div class="card-actions">
-                    ${(!car.archived || currentUser === 'Admin') ? `
+                    ${(canAddCars(currentUser) && (!car.archived || currentUser === 'Admin')) ? `
                     <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
                     ` : ''}
                     
-                    ${(!car.archived || currentUser === 'Admin') ? `
+                    ${(isOwner(currentUser) && (!car.archived || currentUser === 'Admin')) ? `
                     <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
@@ -1534,11 +1546,13 @@ function generateCarCardHtml(car) {
                     <button class="btn-status ${status === 'w-trakcie' ? 'active' : ''}" data-id="${car.id}" data-status="w-trakcie">W trakcie</button>
                     <button class="btn-status ${status === 'gotowe' ? 'active' : ''}" data-id="${car.id}" data-status="gotowe">Gotowe</button>
                 </div>
+                ${isOwner(currentUser) ? `
                 <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
                     <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
                         📥 PRZENIEŚ DO ZREALIZOWANYCH
                     </button>
                 </div>
+                ` : ''}
                 ` : ''}
             </div>
         </div>
@@ -2123,6 +2137,10 @@ async function toggleCarTask(carId, taskIndex) {
 }
 
 async function archiveCar(id) {
+    if (!isOwner(currentUser)) {
+        showToast("Tylko właściciel może przenieść auto do zrealizowanych!", "error");
+        return;
+    }
     const car = cars.find(c => c.id === id);
     const confirmed = await showConfirm(
         `Czy na pewno chcesz przenieść auto ${car ? car.brand : ''} do zrealizowanych?`,
@@ -2328,9 +2346,13 @@ carForm.addEventListener('submit', async (e) => {
     const carData = {
         brand: document.getElementById('car-brand').value,
         plateNum: document.getElementById('car-plate').value,
-        price: parseFloat(document.getElementById('car-price').value) || 0,
+        price: isOwner(currentUser) 
+            ? (parseFloat(document.getElementById('car-price').value) || 0) 
+            : (id && cars.find(c => c.id === id) ? (cars.find(c => c.id === id).price || 0) : 0),
         ownerName: document.getElementById('car-owner-name').value || '',
-        ownerPhone: document.getElementById('car-owner-phone').value || '',
+        ownerPhone: isOwner(currentUser) 
+            ? (document.getElementById('car-owner-phone').value || '') 
+            : (id && cars.find(c => c.id === id) ? (cars.find(c => c.id === id).ownerPhone || '') : ''),
         history: document.getElementById('car-history').value || '',
         location: document.getElementById('car-location') ? document.getElementById('car-location').value : 'Brak',
         workers: assignedWorkersArr,
@@ -2385,6 +2407,10 @@ carForm.addEventListener('submit', async (e) => {
 });
 
 async function deleteCar(id) {
+    if (!isOwner(currentUser)) {
+        showToast("Tylko właściciel może usunąć samochód!", "error");
+        return;
+    }
     const car = cars.find(c => c.id === id);
     const confirmed = await showConfirm(
         `Czy na pewno chcesz usunąć samochód ${car ? car.brand : ''}? Operacja jest nieodwracalna.`,
@@ -2405,14 +2431,24 @@ async function deleteCar(id) {
 
 function editCar(id) {
     const car = cars.find(c => c.id === id);
-    if (car) {
-        modalTitle.textContent = 'Edytuj Samochód';
-        document.getElementById('car-id').value = car.id;
-        document.getElementById('car-brand').value = car.brand;
-        document.getElementById('car-plate').value = car.plateNum || '';
-        document.getElementById('car-price').value = car.price;
-        document.getElementById('car-owner-name').value = car.ownerName || '';
-        document.getElementById('car-owner-phone').value = car.ownerPhone || '';
+    if (!car) return;
+    if (car.archived && !isOwner(currentUser)) {
+        showToast("Brak uprawnień do edycji aut w zrealizowanych!", "error");
+        return;
+    }
+    if (!canAddCars(currentUser)) {
+        showToast("Brak uprawnień do edycji aut!", "error");
+        return;
+    }
+
+    const owner = isOwner(currentUser);
+    modalTitle.textContent = 'Edytuj Samochód';
+    document.getElementById('car-id').value = car.id;
+    document.getElementById('car-brand').value = car.brand;
+    document.getElementById('car-plate').value = car.plateNum || '';
+    document.getElementById('car-price').value = owner ? (car.price || '') : '';
+    document.getElementById('car-owner-name').value = car.ownerName || '';
+    document.getElementById('car-owner-phone').value = owner ? (car.ownerPhone || '') : '';
         document.getElementById('car-history').value = car.history || '';
         if (document.getElementById('car-location')) {
             document.getElementById('car-location').value = car.location || 'Brak';
@@ -2444,7 +2480,6 @@ function editCar(id) {
         renderCustomTodosInForm();
 
         carModal.classList.add('active');
-    }
 }
 
 // Ukrainian Language & Translation Support

@@ -303,6 +303,13 @@ body {
     color: var(--text-muted);
 }
 
+.archive-row .col.tasks,
+.archive-header .col.tasks {
+    flex: 2.5;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .archive-row .col.actions {
     flex: 0.5;
     display: flex;
