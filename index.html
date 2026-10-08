@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.6">
+    <link rel="stylesheet" href="style.css?v=2.7">
 </head>
 
 <body class="light-theme">
@@ -110,7 +110,7 @@
                         <button id="view-calendar" class="tab-btn">📅 Kalendarz</button>
                         <button id="view-notes" class="tab-btn">📝 Notatki</button>
                         <button id="view-trash" class="tab-btn">🗑️ Śmieci</button>
-                        <button id="view-archive" class="tab-btn">📦 Archiwum</button>
+                        <button id="view-archive" class="tab-btn">📦 Zrealizowane</button>
                         <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
                     </div>
                 </div>
@@ -148,7 +148,7 @@
                     <button class="period-btn" data-period="3months">3 Miesiące</button>
                 </div>
                 <div class="archive-stats">
-                    <span class="label">Suma w Archiwum:</span>
+                    <span class="label">Suma w Zrealizowanych:</span>
                     <span id="archive-total-value" class="val price-value">0,00 zł</span>
                 </div>
             </div>
@@ -417,7 +417,7 @@
             </button>
             <button id="mob-nav-archive" class="mob-nav-item">
                 <span class="mob-icon">📦</span>
-                <span class="mob-label">Archiwum</span>
+                <span class="mob-label">Zrealizowane</span>
             </button>
             <button id="mob-nav-admin" class="mob-nav-item" style="display:none;">
                 <span class="mob-icon">👑</span>
@@ -815,7 +815,7 @@
 
     <div id="toast-container"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script type="module" src="app.js?v=2.6"></script>
+    <script type="module" src="app.js?v=2.7"></script>
 </body>
 
 </html>

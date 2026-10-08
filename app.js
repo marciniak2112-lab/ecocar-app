@@ -425,6 +425,7 @@ function init() {
     });
 
     setInterval(updateCountdowns, 1000);
+    setInterval(processAutoArchiving, 60000);
 
     // Navigation Click Handlers
     setupNavigation();
@@ -1162,23 +1163,116 @@ function openCalendarDayModal(dateStr, dayCars) {
         calDayCarsList.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">Brak zaplanowanych aut na ten dzień.</p>';
     } else {
         calDayCarsList.innerHTML = dayCars.map(car => `
-            <div class="cal-day-car-item">
-                <div>
-                    <strong>${car.brand}</strong> ${car.plateNum ? `(${car.plateNum})` : ''}
-                    <div style="font-size:0.75rem; margin-top:3px;">
-                        <span style="font-weight:700; color:${car.visitType === 'ogledziny' ? '#f59e0b' : 'var(--primary-green)'};">
-                            ${car.visitType === 'ogledziny' ? '🔍 TYLKO OGLĘDZINY / WYCENA' : '🛠️ PEŁNA USŁUGA'}
-                        </span>
+            <div class="cal-day-car-item" style="flex-direction:column; align-items:stretch;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <strong>${car.brand}</strong> ${car.plateNum ? `(${car.plateNum})` : ''}
+                        <div style="font-size:0.75rem; margin-top:3px;">
+                            <span style="font-weight:700; color:${car.visitType === 'ogledziny' ? '#f59e0b' : 'var(--primary-green)'};">
+                                ${car.visitType === 'ogledziny' ? '🔍 TYLKO OGLĘDZINY / WYCENA' : '🛠️ PEŁNA USŁUGA'}
+                            </span>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                            Właściciel: ${car.ownerName || '---'} | Status: ${car.status || 'przyjedzie'}
+                        </div>
+                        ${car.arrivalTime ? `<div style="font-size:0.75rem; color:var(--primary-green); margin-top:2px;">🕒 Godz. przyjazdu: <strong>${car.arrivalTime}</strong></div>` : ''}
                     </div>
-                    <div style="font-size:0.75rem; color:var(--text-muted);">
-                        Właściciel: ${car.ownerName || '---'} | Status: ${car.status || 'przyjedzie'}
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn-secondary btn-cal-reschedule" data-id="${car.id}" style="font-size:0.75rem; padding:6px 10px; background:rgba(59, 130, 246, 0.15); border:1px solid #3b82f6; color:#3b82f6;">
+                            📅 Zmień Datę
+                        </button>
+                        <button class="btn-secondary btn-pin-main" data-id="${car.id}" style="font-size:0.75rem; padding:6px 10px;">
+                            📌 Do głównych
+                        </button>
+                        <button class="btn-secondary btn-cal-edit" data-id="${car.id}" title="Pełna edycja auta" style="font-size:0.75rem; padding:6px 9px;">
+                            ✏️
+                        </button>
                     </div>
                 </div>
-                <button class="btn-secondary btn-pin-main" data-id="${car.id}" style="font-size:0.75rem; padding:6px 10px;">
-                    📌 Dodaj do Ekranu Głównym
-                </button>
+
+                <div class="cal-reschedule-box" id="reschedule-box-${car.id}" style="display:none; width:100%; margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid rgba(59, 130, 246, 0.35); border-radius:8px;">
+                    <div style="font-size:0.78rem; font-weight:700; color:#3b82f6; margin-bottom:6px;">
+                        📅 Zmiana daty przyjazdu klienta (${car.brand})
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                        <div>
+                            <label style="display:block; font-size:0.7rem; color:var(--text-muted); margin-bottom:2px;">Nowa data przyjazdu:</label>
+                            <input type="date" class="form-input new-cal-date" id="new-cal-date-${car.id}" value="${car.arrivalDate || dateStr}" style="padding:6px 8px; font-size:0.8rem; width:135px;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.7rem; color:var(--text-muted); margin-bottom:2px;">Godzina (np. 08:30):</label>
+                            <input type="text" class="form-input new-cal-time" id="new-cal-time-${car.id}" placeholder="np. 08:30" value="${car.arrivalTime || ''}" style="padding:6px 8px; font-size:0.8rem; width:100px;">
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-primary btn-save-reschedule" data-id="${car.id}" style="padding:6px 12px; font-size:0.78rem; background:#3b82f6; border-color:#3b82f6;">
+                                💾 Zapisz
+                            </button>
+                            <button class="btn-secondary btn-cancel-reschedule" data-id="${car.id}" style="padding:6px 10px; font-size:0.78rem;">
+                                Anuluj
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         `).join('');
+
+        // Reschedule Toggle and Save Listeners
+        calDayCarsList.querySelectorAll('.btn-cal-reschedule').forEach(btn => {
+            btn.onclick = () => {
+                const cId = btn.dataset.id;
+                const box = document.getElementById(`reschedule-box-${cId}`);
+                if (box) {
+                    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+                }
+            };
+        });
+
+        calDayCarsList.querySelectorAll('.btn-cancel-reschedule').forEach(btn => {
+            btn.onclick = () => {
+                const cId = btn.dataset.id;
+                const box = document.getElementById(`reschedule-box-${cId}`);
+                if (box) box.style.display = 'none';
+            };
+        });
+
+        calDayCarsList.querySelectorAll('.btn-save-reschedule').forEach(btn => {
+            btn.onclick = async () => {
+                const cId = btn.dataset.id;
+                const dateInput = document.getElementById(`new-cal-date-${cId}`);
+                const timeInput = document.getElementById(`new-cal-time-${cId}`);
+                const newDate = dateInput ? dateInput.value : '';
+                const newTime = timeInput ? timeInput.value.trim() : '';
+
+                if (!newDate) {
+                    showToast("Wybierz poprawną nową datę!", "error");
+                    return;
+                }
+
+                const targetCar = cars.find(c => c.id === cId);
+                try {
+                    await updateDoc(doc(db, 'cars', cId), {
+                        arrivalDate: newDate,
+                        arrivalTime: newTime || null
+                    });
+                    showToast(`Zmieniono datę przyjazdu dla ${targetCar ? targetCar.brand : ''} na ${newDate}!`, "success");
+                    logAction(`Zmieniono datę przyjazdu auta ${targetCar ? targetCar.brand : cId} na: ${newDate} ${newTime ? 'godz. ' + newTime : ''}`);
+                    calDayModal.classList.remove('active');
+                    renderCalendar();
+                } catch (err) {
+                    console.error("Reschedule error", err);
+                    showToast("Błąd zapisu nowej daty", "error");
+                }
+            };
+        });
+
+        // Edit Car Listener
+        calDayCarsList.querySelectorAll('.btn-cal-edit').forEach(btn => {
+            btn.onclick = () => {
+                const cId = btn.dataset.id;
+                calDayModal.classList.remove('active');
+                editCar(cId);
+            };
+        });
 
         // Pin to main event listeners
         calDayCarsList.querySelectorAll('.btn-pin-main').forEach(btn => {
@@ -1243,7 +1337,7 @@ function renderCars(filter = '') {
     if (filteredCars.length === 0) {
         carsGrid.innerHTML = `
             <div class="empty-state">
-                <p>${filter ? 'Nie znaleziono samochodów.' : (currentView === 'active' ? 'Brak aktywnych zleceń.' : 'Archiwum jest puste.')}</p>
+                <p>${filter ? 'Nie znaleziono samochodów.' : (currentView === 'active' ? 'Brak aktywnych zleceń.' : 'Brak zrealizowanych zleceń.')}</p>
             </div>
         `;
         return;
@@ -1330,7 +1424,7 @@ function generateCarCardHtml(car) {
     if (isOtherWorkerCar) {
         // Greyed-out minimal view for other worker's car
         return `
-            <div class="car-card worker-other ${car.priority ? 'priority-high' : ''}" data-id="${car.id}">
+            <div class="car-card worker-other ${car.priority ? 'priority-high' : ''} ${status === 'gotowe' ? 'status-gotowe' : ''}" data-id="${car.id}">
                 <div class="dates-row">
                     <span class="worker-other-badge">👤 Przypisany: ${getCarWorkerDisplay(car)}</span>
                     ${car.location ? `<span class="location-badge" style="font-size:0.75rem; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">📍 ${car.location}</span>` : ''}
@@ -1347,7 +1441,7 @@ function generateCarCardHtml(car) {
 
     // Full / Collapsible Card View
     return `
-        <div class="car-card ${car.priority ? 'priority-high' : ''} collapsible" data-id="${car.id}">
+        <div class="car-card ${car.priority ? 'priority-high' : ''} ${status === 'gotowe' ? 'status-gotowe' : ''} collapsible" data-id="${car.id}">
             <div class="car-card-header-toggle">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
                     <h3 style="display:inline-block; margin:0; font-size:1rem;">${car.brand}</h3>
@@ -1436,7 +1530,7 @@ function generateCarCardHtml(car) {
                 </div>
                 <div style="margin-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 12px;">
                     <button class="btn-status btn-archive" data-id="${car.id}" style="width: 100%; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--primary-green);">
-                        📥 PRZENIEŚ DO ARCHIWUM
+                        📥 PRZENIEŚ DO ZREALIZOWANYCH
                     </button>
                 </div>
                 ` : ''}
@@ -1898,7 +1992,7 @@ async function toggleCarTask(carId, taskIndex) {
 async function archiveCar(id) {
     const car = cars.find(c => c.id === id);
     const confirmed = await showConfirm(
-        `Czy na pewno chcesz wysłać auto ${car ? car.brand : ''} do archiwum?`,
+        `Czy na pewno chcesz przenieść auto ${car ? car.brand : ''} do zrealizowanych?`,
         'PRZENIEŚ',
         'ANULUJ',
         false
@@ -1910,10 +2004,10 @@ async function archiveCar(id) {
                 status: 'gotowe',
                 statusChangeDate: new Date().toISOString()
             });
-            showToast("Zarchiwizowano pojazd", "success");
-            logAction(`Zarchiwizowano auto: ${car ? car.brand : 'nieznane'}`);
+            showToast("Przeniesiono auto do zrealizowanych", "success");
+            logAction(`Przeniesiono auto do zrealizowanych: ${car ? car.brand : 'nieznane'}`);
         } catch (error) {
-            showToast("Błąd archiwizacji", "error");
+            showToast("Błąd podczas przenoszenia", "error");
         }
     }
 }
@@ -1921,10 +2015,16 @@ async function archiveCar(id) {
 async function updateCarStatus(id, newStatus) {
     try {
         const car = cars.find(c => c.id === id);
-        await updateDoc(doc(db, 'cars', id), {
+        const updates = {
             status: newStatus,
             statusChangeDate: new Date().toISOString()
-        });
+        };
+        if (newStatus === 'gotowe') {
+            updates.readyAt = new Date().toISOString();
+        } else {
+            updates.readyAt = null;
+        }
+        await updateDoc(doc(db, 'cars', id), updates);
         showToast(`Zmieniono status na: ${newStatus}`, 'success');
         logAction(`Zmiana statusu auta ${car ? car.brand : ''} na: ${newStatus}`);
     } catch (e) {
@@ -2231,6 +2331,9 @@ function applyLanguage(lang) {
 
 function translateDOM() {
     if (currentLang !== 'ua') {
+        if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Zrealizowane';
+        const mobArchiveLabel = document.querySelector('#mob-nav-archive .mob-label');
+        if (mobArchiveLabel) mobArchiveLabel.textContent = 'Zrealizowane';
         return;
     }
 
@@ -2239,7 +2342,7 @@ function translateDOM() {
     if (viewCalendarBtn) viewCalendarBtn.innerHTML = '📅 Календар';
     if (viewNotesBtn) viewNotesBtn.innerHTML = '📝 Нотатки';
     if (viewTrashBtn) viewTrashBtn.innerHTML = '🗑️ Сміття';
-    if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Архів';
+    if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Завершені';
     if (viewAdminBtn) viewAdminBtn.innerHTML = '👑 Панель Адмін';
     if (addCarBtn) addCarBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Додати авто';
 
@@ -2253,6 +2356,8 @@ function translateDOM() {
     if (mobNotesLabel) mobNotesLabel.textContent = 'Нотатки';
     const mobTrashLabel = document.querySelector('#mob-nav-trash .mob-label');
     if (mobTrashLabel) mobTrashLabel.textContent = 'Сміття';
+    const mobArchiveLabel = document.querySelector('#mob-nav-archive .mob-label');
+    if (mobArchiveLabel) mobArchiveLabel.textContent = 'Завершені';
 
     if (searchInput) searchInput.placeholder = 'Шукати марку, номер реєстрації, клієнта або працівника...';
 
@@ -2265,7 +2370,7 @@ function translateDOM() {
         if (quickNoteBtn) quickNoteBtn.textContent = '📝 Додати нотатку до цього авто';
 
         const archiveBtn = card.querySelector('.btn-archive');
-        if (archiveBtn) archiveBtn.textContent = '📥 ПЕРЕНЕСТИ В АРХІВ';
+        if (archiveBtn) archiveBtn.textContent = '📥 ПЕРЕНЕСТИ В ЗАВЕРШЕНІ';
 
         card.querySelectorAll('.car-info-row .label').forEach(lbl => {
             const txt = lbl.textContent.trim();
@@ -2820,8 +2925,33 @@ async function loadAdminData() {
     }).join('') || '<p style="text-align:center; padding: 20px; color: var(--text-muted);">Brak aktywności</p>';
 }
 
-function processAutoArchiving() {
-    // Manual archiving only
+async function processAutoArchiving() {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const readyCarsToArchive = (cars || []).filter(car => {
+        if (car.archived) return false;
+        if (car.status !== 'gotowe') return false;
+        const readyTimestamp = car.readyAt || car.statusChangeDate;
+        if (!readyTimestamp) return false;
+        const readyTime = new Date(readyTimestamp).getTime();
+        if (isNaN(readyTime)) return false;
+        return (now - readyTime) >= ONE_DAY_MS;
+    });
+
+    for (const car of readyCarsToArchive) {
+        try {
+            await updateDoc(doc(db, 'cars', car.id), {
+                archived: true,
+                status: 'gotowe',
+                statusChangeDate: new Date().toISOString(),
+                autoArchivedAt: new Date().toISOString()
+            });
+            logAction(`Auto-przeniesienie do zrealizowanych po 1 dniu gotowości: ${car.brand} [${car.plateNum || ''}]`);
+        } catch (e) {
+            console.error("Auto archive error for", car.id, e);
+        }
+    }
 }
 
 function showToast(message, type = 'info') {
