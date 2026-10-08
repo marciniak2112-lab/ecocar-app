@@ -194,11 +194,11 @@ async function changeUserPassword(username, newPassword) {
     }
 }
 
-// Helper: Check if user is Owner or Manager (Właściciel / Kierownik)
+// Helper: Check if user is Owner (Właściciel) - Admin, Tomek, Monia
 function isOwner(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika' || u === 'lukasz' || u === 'łukasz';
+    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
 }
 
 // Helper: Check if user can add cars (Admin, Tomek, Łukasz)
@@ -208,11 +208,11 @@ function canAddCars(user = currentUser) {
     return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
 }
 
-// Helper: Check if user can manage locations and user accounts (Tomek, Admin, Łukasz - Kierownik)
+// Helper: Check if user can access Admin Panel and manage users (Admin & Tomek ONLY)
 function canManageLocationsAndUsers(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
+    return u === 'admin' || u === 'tomek' || u === 'tomasz';
 }
 
 // DOM Elements
@@ -472,6 +472,10 @@ function init() {
 
 function setupNavigation() {
     const switchTab = (targetView) => {
+        if (targetView === 'admin' && !canManageLocationsAndUsers(currentUser)) {
+            showToast("Panel administratora dostępny jest tylko dla Admina i Tomka.", "error");
+            return;
+        }
         currentView = targetView;
         viewActiveBtn.classList.toggle('active', targetView === 'active');
         if (viewLocationsBtn) viewLocationsBtn.classList.toggle('active', targetView === 'locations');
@@ -1412,7 +1416,7 @@ function renderActiveGrid(filteredCars) {
 function generateCarCardHtml(car) {
     const status = car.status || 'przyjedzie';
     const isWorkerRole = !isOwner(currentUser) && currentUser !== '';
-    const isAssignedToMe = isCarAssignedToWorker(car, currentUser);
+    const isAssignedToMe = isCarAssignedToWorker(car, currentUser) || (car.addedBy && currentUser && car.addedBy.toLowerCase() === currentUser.toLowerCase());
     const isOtherWorkerCar = isWorkerRole && !isAssignedToMe;
     
     // Normalize todo items into task objects
@@ -2221,7 +2225,7 @@ function formatCurrency(val) {
 // Modal Actions & Triggers
 addCarBtn.addEventListener('click', () => {
     if (!canAddCars(currentUser)) {
-        showToast("Tylko Admin, Tomek lub Łukasz (Kierownik) może dodawać nowe auta!", "error");
+        showToast("Brak uprawnień do dodawania nowych aut!", "error");
         return;
     }
     modalTitle.textContent = 'Dodaj Nowy Samochód';
@@ -2299,6 +2303,10 @@ carForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const id = document.getElementById('car-id').value;
+    if (!id && !canAddCars(currentUser)) {
+        showToast("Brak uprawnień do dodawania nowych aut!", "error");
+        return;
+    }
     const serviceName = document.getElementById('car-service-name').value.trim();
     const visitType = document.getElementById('car-visit-type').value || 'usluga';
 
@@ -2835,6 +2843,7 @@ function setupReportForm() {
 }
 
 async function loadAdminData() {
+    if (!canManageLocationsAndUsers(currentUser)) return;
     const usersStatusGrid = document.getElementById('users-status-grid');
     if (!usersStatusGrid) return;
 
@@ -2842,7 +2851,7 @@ async function loadAdminData() {
         { id: 'admin', name: 'Admin', role: 'Właściciel / System' },
         { id: 'tomek', name: 'Tomek', role: 'Właściciel' },
         { id: 'monia', name: 'Monia', role: 'Właściciel' },
-        { id: 'lukasz', name: 'Łukasz', role: 'Kierownik' },
+        { id: 'lukasz', name: 'Łukasz', role: 'Pracownik' },
         { id: 'adam', name: 'Adam', role: 'Pracownik' },
         { id: 'nastka', name: 'Nastka', role: 'Pracownik' }
     ];
