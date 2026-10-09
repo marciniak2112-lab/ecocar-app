@@ -38,6 +38,7 @@ const notesCol = collection(db, 'notes');
 const archivedNotesCol = collection(db, 'archived_notes');
 const trashCol = collection(db, 'trash_schedule');
 const deletedUsersCol = collection(db, 'deleted_users');
+const shoppingCol = collection(db, 'shopping_items');
 
 // State Management
 let cars = [];
@@ -45,9 +46,12 @@ let notifications = [];
 let notes = [];
 let archivedNotes = [];
 let trashSchedule = [];
+let shoppingItems = [];
+let shoppingFilter = 'pending'; // 'pending' | 'bought'
+let shoppingSearchQuery = '';
 let customUsers = [];
 let deletedUsers = [];
-let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'archive', 'admin'
+let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'shopping', 'archive', 'admin'
 let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
 
@@ -253,6 +257,8 @@ const viewLocationsBtn = document.getElementById('view-locations');
 const viewCalendarBtn = document.getElementById('view-calendar');
 const viewNotesBtn = document.getElementById('view-notes');
 const viewTrashBtn = document.getElementById('view-trash');
+const viewShoppingBtn = document.getElementById('view-shopping');
+const shoppingBadge = document.getElementById('shopping-badge');
 const viewArchiveBtn = document.getElementById('view-archive');
 const viewAdminBtn = document.getElementById('view-admin');
 
@@ -262,10 +268,25 @@ const mobNavLocations = document.getElementById('mob-nav-locations');
 const mobNavCalendar = document.getElementById('mob-nav-calendar');
 const mobNavNotes = document.getElementById('mob-nav-notes');
 const mobNavTrash = document.getElementById('mob-nav-trash');
+const mobNavShopping = document.getElementById('mob-nav-shopping');
+const mobShoppingBadge = document.getElementById('mob-shopping-badge');
 const mobNavArchive = document.getElementById('mob-nav-archive');
 const mobNavAdmin = document.getElementById('mob-nav-admin');
 const mobNavNotif = document.getElementById('mob-nav-notif');
 const mobNotifBadge = document.getElementById('mob-notif-badge');
+
+// Shopping Section Elements
+const shoppingSection = document.getElementById('shopping-section');
+const btnToggleShoppingForm = document.getElementById('btn-toggle-shopping-form');
+const newShoppingFormBox = document.getElementById('new-shopping-form-box');
+const shoppingForm = document.getElementById('shopping-form');
+const btnCancelShopping = document.getElementById('btn-cancel-shopping');
+const filterShoppingPendingBtn = document.getElementById('filter-shopping-pending');
+const filterShoppingBoughtBtn = document.getElementById('filter-shopping-bought');
+const countShoppingPending = document.getElementById('count-shopping-pending');
+const countShoppingBought = document.getElementById('count-shopping-bought');
+const shoppingSearchInput = document.getElementById('shopping-search-input');
+const shoppingGrid = document.getElementById('shopping-grid');
 
 const adminSection = document.getElementById('admin-section');
 const logsList = document.getElementById('logs-list');
@@ -433,6 +454,16 @@ function init() {
         renderTrashSchedule();
     });
 
+    // Shopping Items Realtime Listener
+    const shoppingQ = query(shoppingCol, orderBy('createdAt', 'desc'));
+    onSnapshot(shoppingQ, (snapshot) => {
+        shoppingItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        updateShoppingBadge();
+        if (currentView === 'shopping') {
+            renderShopping();
+        }
+    });
+
     setInterval(updateCountdowns, 1000);
     setInterval(processAutoArchiving, 60000);
 
@@ -441,6 +472,9 @@ function init() {
 
     // Notes Module Handlers
     setupNotesModule();
+
+    // Shopping Module Handlers
+    setupShoppingModule();
 
     // Account Creation Handlers
     setupAccountCreation();
@@ -493,6 +527,7 @@ function setupNavigation() {
         viewCalendarBtn.classList.toggle('active', targetView === 'calendar');
         if (viewNotesBtn) viewNotesBtn.classList.toggle('active', targetView === 'notes');
         if (viewTrashBtn) viewTrashBtn.classList.toggle('active', targetView === 'trash');
+        if (viewShoppingBtn) viewShoppingBtn.classList.toggle('active', targetView === 'shopping');
         viewArchiveBtn.classList.toggle('active', targetView === 'archive');
         viewAdminBtn.classList.toggle('active', targetView === 'admin');
 
@@ -502,6 +537,7 @@ function setupNavigation() {
         mobNavCalendar.classList.toggle('active', targetView === 'calendar');
         if (mobNavNotes) mobNavNotes.classList.toggle('active', targetView === 'notes');
         if (mobNavTrash) mobNavTrash.classList.toggle('active', targetView === 'trash');
+        if (mobNavShopping) mobNavShopping.classList.toggle('active', targetView === 'shopping');
         mobNavArchive.classList.toggle('active', targetView === 'archive');
         mobNavAdmin.classList.toggle('active', targetView === 'admin');
 
@@ -511,6 +547,7 @@ function setupNavigation() {
         calendarSection.style.display = (targetView === 'calendar') ? 'block' : 'none';
         if (notesSection) notesSection.style.display = (targetView === 'notes') ? 'block' : 'none';
         if (trashSection) trashSection.style.display = (targetView === 'trash') ? 'block' : 'none';
+        if (shoppingSection) shoppingSection.style.display = (targetView === 'shopping') ? 'block' : 'none';
         adminSection.style.display = (targetView === 'admin') ? 'block' : 'none';
         archiveControls.style.display = (targetView === 'archive') ? 'flex' : 'none';
 
@@ -524,6 +561,8 @@ function setupNavigation() {
             renderNotes();
         } else if (targetView === 'trash') {
             renderTrashSchedule();
+        } else if (targetView === 'shopping') {
+            renderShopping();
         } else if (targetView === 'admin') {
             loadAdminData();
         }
@@ -534,6 +573,7 @@ function setupNavigation() {
     viewCalendarBtn.onclick = () => switchTab('calendar');
     if (viewNotesBtn) viewNotesBtn.onclick = () => switchTab('notes');
     if (viewTrashBtn) viewTrashBtn.onclick = () => switchTab('trash');
+    if (viewShoppingBtn) viewShoppingBtn.onclick = () => switchTab('shopping');
     viewArchiveBtn.onclick = () => switchTab('archive');
     viewAdminBtn.onclick = () => switchTab('admin');
 
@@ -542,6 +582,7 @@ function setupNavigation() {
     mobNavCalendar.onclick = () => switchTab('calendar');
     if (mobNavNotes) mobNavNotes.onclick = () => switchTab('notes');
     if (mobNavTrash) mobNavTrash.onclick = () => switchTab('trash');
+    if (mobNavShopping) mobNavShopping.onclick = () => switchTab('shopping');
     mobNavArchive.onclick = () => switchTab('archive');
     mobNavAdmin.onclick = () => switchTab('admin');
 
@@ -921,6 +962,10 @@ function updateUIForRole() {
             if (viewActiveBtn) viewActiveBtn.click();
         }
     }
+
+    // Shopping tab: accessible to ALL users!
+    if (viewShoppingBtn) viewShoppingBtn.style.display = 'block';
+    if (mobNavShopping) mobNavShopping.style.display = 'flex';
 
     const accountBox = document.getElementById('account-creation-box');
     if (accountBox) {
@@ -2033,6 +2078,367 @@ function renderTrashSchedule() {
     }
 }
 
+// ==========================================================================
+// Shopping / Supplies Module (Zakupy / Zaopatrzenie Warsztatu)
+// ==========================================================================
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function updateShoppingBadge() {
+    const pendingItems = shoppingItems.filter(item => item.status !== 'bought');
+    const boughtItems = shoppingItems.filter(item => item.status === 'bought');
+    const pendingCount = pendingItems.length;
+    const boughtCount = boughtItems.length;
+    const hasUrgent = pendingItems.some(item => !!item.isUrgent);
+
+    // Update filter tab counters
+    if (countShoppingPending) countShoppingPending.textContent = pendingCount;
+    if (countShoppingBought) countShoppingBought.textContent = boughtCount;
+
+    // Desktop nav badge
+    const badgeEl = document.getElementById('shopping-badge');
+    if (badgeEl) {
+        if (pendingCount > 0) {
+            badgeEl.textContent = hasUrgent ? `🚨 ${pendingCount}` : pendingCount;
+            badgeEl.style.display = 'inline-flex';
+            badgeEl.classList.toggle('has-urgent', hasUrgent);
+        } else {
+            badgeEl.style.display = 'none';
+        }
+    }
+
+    // Mobile nav badge
+    if (mobShoppingBadge) {
+        if (pendingCount > 0) {
+            mobShoppingBadge.textContent = pendingCount;
+            mobShoppingBadge.style.display = 'inline-flex';
+            if (hasUrgent) {
+                mobShoppingBadge.style.background = '#ef4444';
+            } else {
+                mobShoppingBadge.style.background = '#10b981';
+            }
+        } else {
+            mobShoppingBadge.style.display = 'none';
+        }
+    }
+}
+
+function setupShoppingModule() {
+    // Toggle New Item Form Box
+    if (btnToggleShoppingForm && newShoppingFormBox) {
+        btnToggleShoppingForm.onclick = () => {
+            const isHidden = newShoppingFormBox.style.display === 'none' || !newShoppingFormBox.style.display;
+            newShoppingFormBox.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                const nameInp = document.getElementById('shopping-name');
+                if (nameInp) nameInp.focus();
+            }
+        };
+    }
+
+    // Cancel Button
+    if (btnCancelShopping && newShoppingFormBox) {
+        btnCancelShopping.onclick = () => {
+            newShoppingFormBox.style.display = 'none';
+            if (shoppingForm) shoppingForm.reset();
+        };
+    }
+
+    // Quick Chips for Remaining Quantity
+    const quickChips = document.querySelectorAll('.shopping-quick-chips .quick-chip');
+    quickChips.forEach(chip => {
+        chip.onclick = () => {
+            const val = chip.dataset.val;
+            const qtyInput = document.getElementById('shopping-quantity');
+            if (qtyInput && val) {
+                qtyInput.value = val;
+                qtyInput.focus();
+            }
+        };
+    });
+
+    // Filter Buttons (Do kupienia vs Kupione)
+    if (filterShoppingPendingBtn) {
+        filterShoppingPendingBtn.onclick = () => {
+            shoppingFilter = 'pending';
+            filterShoppingPendingBtn.classList.add('active');
+            if (filterShoppingBoughtBtn) filterShoppingBoughtBtn.classList.remove('active');
+            renderShopping();
+        };
+    }
+
+    if (filterShoppingBoughtBtn) {
+        filterShoppingBoughtBtn.onclick = () => {
+            shoppingFilter = 'bought';
+            filterShoppingBoughtBtn.classList.add('active');
+            if (filterShoppingPendingBtn) filterShoppingPendingBtn.classList.remove('active');
+            renderShopping();
+        };
+    }
+
+    // Search Input
+    if (shoppingSearchInput) {
+        shoppingSearchInput.oninput = (e) => {
+            shoppingSearchQuery = (e.target.value || '').toLowerCase().trim();
+            renderShopping();
+        };
+    }
+
+    // Submit Shopping Form
+    if (shoppingForm) {
+        shoppingForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('shopping-name').value.trim();
+            const quantityLeft = document.getElementById('shopping-quantity').value.trim();
+            const isUrgent = document.querySelector('input[name="shopping-priority-val"]:checked')?.value === 'urgent';
+            const notes = document.getElementById('shopping-notes').value.trim();
+
+            if (!name || !quantityLeft) {
+                showToast("Podaj nazwę produktu oraz ile zostało na miejscu!", "error");
+                return;
+            }
+
+            try {
+                await addDoc(shoppingCol, {
+                    name: name,
+                    quantityLeft: quantityLeft,
+                    isUrgent: !!isUrgent,
+                    notes: notes || '',
+                    status: 'pending',
+                    addedBy: currentUser || 'Pracownik',
+                    createdAt: new Date().toISOString(),
+                    boughtBy: null,
+                    boughtAt: null
+                });
+
+                if (isUrgent) {
+                    showToast("🚨 Dodano PILNY produkt do listy zakupów!", "warning");
+                } else {
+                    showToast("Dodano produkt do listy zakupów!", "success");
+                }
+                logAction(`Użytkownik ${currentUser} dodał do listy zakupów: ${name} (zostało na miejscu: ${quantityLeft})`);
+
+                shoppingForm.reset();
+                const normalRadio = document.querySelector('input[name="shopping-priority-val"][value="normal"]');
+                if (normalRadio) normalRadio.checked = true;
+
+                if (newShoppingFormBox) newShoppingFormBox.style.display = 'none';
+            } catch (err) {
+                console.error("Błąd dodawania produktu do zakupów:", err);
+                showToast("Błąd dodawania produktu do zakupów", "error");
+            }
+        };
+    }
+}
+
+function renderShopping() {
+    if (!shoppingGrid) return;
+
+    // Filter items according to active tab ('pending' vs 'bought')
+    let list = shoppingItems.filter(item => {
+        const itemStatus = item.status || 'pending';
+        return shoppingFilter === 'bought' ? (itemStatus === 'bought') : (itemStatus !== 'bought');
+    });
+
+    // Search query filter
+    if (shoppingSearchQuery) {
+        list = list.filter(item => {
+            const name = (item.name || '').toLowerCase();
+            const notes = (item.notes || '').toLowerCase();
+            const qty = (item.quantityLeft || '').toLowerCase();
+            const author = (item.addedBy || '').toLowerCase();
+            const buyer = (item.boughtBy || '').toLowerCase();
+            return name.includes(shoppingSearchQuery) ||
+                   notes.includes(shoppingSearchQuery) ||
+                   qty.includes(shoppingSearchQuery) ||
+                   author.includes(shoppingSearchQuery) ||
+                   buyer.includes(shoppingSearchQuery);
+        });
+    }
+
+    // Sort items
+    if (shoppingFilter === 'pending') {
+        // Urgent first, then newest
+        list.sort((a, b) => {
+            const aUrgent = a.isUrgent ? 1 : 0;
+            const bUrgent = b.isUrgent ? 1 : 0;
+            if (bUrgent !== aUrgent) return bUrgent - aUrgent;
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+    } else {
+        // Bought newest first
+        list.sort((a, b) => new Date(b.boughtAt || b.createdAt || 0) - new Date(a.boughtAt || a.createdAt || 0));
+    }
+
+    // Empty state
+    if (list.length === 0) {
+        if (shoppingFilter === 'pending') {
+            shoppingGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎉</div>
+                    <h3 style="color: var(--text-color); margin-bottom: 0.5rem;">Wszystko jest na warsztacie!</h3>
+                    <p style="max-width: 450px; margin: 0 auto; font-size: 0.9rem;">
+                        ${shoppingSearchQuery ? 'Brak produktów pasujących do wyszukiwania.' : 'Brak produktów wymagających zakupu. Kliknij „➕ Dodaj Produkt”, aby zgłosić chemię lub materiały.'}
+                    </p>
+                </div>
+            `;
+        } else {
+            shoppingGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <div style="font-size: 3rem; margin-bottom: 0.75rem;">📦</div>
+                    <h3 style="color: var(--text-color); margin-bottom: 0.5rem;">Brak kupionych produktów</h3>
+                    <p style="font-size: 0.9rem;">Gdy oznaczysz produkt jako kupiony, pojawi się tutaj w historii.</p>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    // Render cards
+    shoppingGrid.innerHTML = list.map(item => {
+        const isBought = item.status === 'bought';
+        const isUrgent = !!item.isUrgent;
+        const createdDate = item.createdAt ? new Date(item.createdAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        const boughtDate = item.boughtAt ? new Date(item.boughtAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+        // Stock style detection
+        const qLower = (item.quantityLeft || '').toLowerCase();
+        let stockClass = 'stock-ok';
+        let stockIcon = '📦';
+        if (qLower.includes('0') || qLower.includes('brak')) {
+            stockClass = 'stock-zero';
+            stockIcon = '🚨';
+        } else if (qLower.includes('końcówka') || qLower.includes('koncowka') || qLower.includes('reszt') || qLower.includes('ostatn')) {
+            stockClass = 'stock-low';
+            stockIcon = '⚠️';
+        }
+
+        // Priority badge
+        let badgeHtml = '';
+        if (isBought) {
+            badgeHtml = `<span class="shopping-priority-badge bought-badge">✅ Kupione</span>`;
+        } else if (isUrgent) {
+            badgeHtml = `<span class="shopping-priority-badge urgent-badge">🚨 PILNE</span>`;
+        } else {
+            badgeHtml = `<span class="shopping-priority-badge normal-badge">🟢 Standard</span>`;
+        }
+
+        return `
+            <div class="shopping-card ${isUrgent && !isBought ? 'urgent' : ''} ${isBought ? 'bought' : ''}" data-id="${item.id}">
+                <div class="shopping-card-header">
+                    ${badgeHtml}
+                    <span class="shopping-date-author">✍️ ${escapeHTML(item.addedBy || 'Pracownik')} • ${createdDate}</span>
+                </div>
+
+                <h3 class="shopping-product-title">${escapeHTML(item.name)}</h3>
+
+                <div class="shopping-stock-box ${stockClass}">
+                    <span>${stockIcon}</span>
+                    <span>Na miejscu zostało: <strong>${escapeHTML(item.quantityLeft)}</strong></span>
+                </div>
+
+                ${item.notes ? `
+                    <div class="shopping-notes-box">
+                        <strong>Uwagi:</strong> ${escapeHTML(item.notes)}
+                    </div>
+                ` : ''}
+
+                ${isBought ? `
+                    <div class="bought-meta-box">
+                        ✅ Kupione przez: <strong>${escapeHTML(item.boughtBy || 'Pracownik')}</strong>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">⏱️ Data zakupu: ${boughtDate}</div>
+                    </div>
+                ` : ''}
+
+                <div class="shopping-card-footer">
+                    ${!isBought ? `
+                        <button type="button" class="btn-mark-bought" data-id="${item.id}" title="Oznacz jako kupione i przenieś do historii">
+                            ✅ Kupione
+                        </button>
+                    ` : `
+                        <button type="button" class="btn-restore-shopping" data-id="${item.id}" title="Przywróć produkt do listy aktywnych zakupów">
+                            ↩️ Przywróć
+                        </button>
+                    `}
+                    <button type="button" class="btn-delete-shopping" data-id="${item.id}" data-name="${escapeHTML(item.name)}" title="Usuń trwale z listy">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach event listeners to action buttons
+    shoppingGrid.querySelectorAll('.btn-mark-bought').forEach(btn => {
+        btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const item = shoppingItems.find(i => i.id === id);
+            if (!item) return;
+
+            try {
+                await updateDoc(doc(db, 'shopping_items', id), {
+                    status: 'bought',
+                    boughtBy: currentUser || 'Pracownik',
+                    boughtAt: new Date().toISOString()
+                });
+                showToast(`Kupiono: ${item.name}!`, "success");
+                logAction(`Użytkownik ${currentUser} oznaczył jako kupione: ${item.name}`);
+            } catch (err) {
+                console.error("Błąd oznaczania zakupu:", err);
+                showToast("Błąd aktualizacji zakupu", "error");
+            }
+        };
+    });
+
+    shoppingGrid.querySelectorAll('.btn-restore-shopping').forEach(btn => {
+        btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const item = shoppingItems.find(i => i.id === id);
+            if (!item) return;
+
+            try {
+                await updateDoc(doc(db, 'shopping_items', id), {
+                    status: 'pending',
+                    boughtBy: null,
+                    boughtAt: null
+                });
+                showToast(`Przywrócono do listy: ${item.name}`, "info");
+                logAction(`Użytkownik ${currentUser} przywrócił do listy zakupów: ${item.name}`);
+            } catch (err) {
+                console.error("Błąd przywracania zakupu:", err);
+                showToast("Błąd przywracania zakupu", "error");
+            }
+        };
+    });
+
+    shoppingGrid.querySelectorAll('.btn-delete-shopping').forEach(btn => {
+        btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name || 'ten produkt';
+
+            const confirmed = await showConfirm(`Czy na pewno chcesz trwale usunąć "${name}" z listy zakupów?`, "USUŃ", "ANULUJ", true);
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(db, 'shopping_items', id));
+                    showToast("Usunięto pozycję z listy zakupów", "success");
+                    logAction(`Użytkownik ${currentUser} usunął z listy zakupów: ${name}`);
+                } catch (err) {
+                    console.error("Błąd usuwania zakupu:", err);
+                    showToast("Błąd usuwania zakupu", "error");
+                }
+            }
+        };
+    });
+}
+
 // Account Creation Logic for Tomek & Admin
 function setupAccountCreation() {
     const accountBox = document.getElementById('account-creation-box');
@@ -2506,6 +2912,14 @@ function translateDOM() {
         if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Zrealizowane';
         const mobArchiveLabel = document.querySelector('#mob-nav-archive .mob-label');
         if (mobArchiveLabel) mobArchiveLabel.textContent = 'Zrealizowane';
+        if (viewShoppingBtn) {
+            const b = document.getElementById('shopping-badge');
+            const cnt = b ? b.textContent : '0';
+            const isDisp = b && b.style.display !== 'none';
+            viewShoppingBtn.innerHTML = `🛒 Zakupy <span id="shopping-badge" class="tab-badge" style="${isDisp ? '' : 'display:none;'}">${cnt}</span>`;
+        }
+        const mobShopLabel = document.querySelector('#mob-nav-shopping .mob-label');
+        if (mobShopLabel) mobShopLabel.textContent = 'Zakupy';
         return;
     }
 
@@ -2514,6 +2928,12 @@ function translateDOM() {
     if (viewCalendarBtn) viewCalendarBtn.innerHTML = '📅 Календар';
     if (viewNotesBtn) viewNotesBtn.innerHTML = '📝 Нотатки';
     if (viewTrashBtn) viewTrashBtn.innerHTML = '🗑️ Сміття';
+    if (viewShoppingBtn) {
+        const b = document.getElementById('shopping-badge');
+        const cnt = b ? b.textContent : '0';
+        const isDisp = b && b.style.display !== 'none';
+        viewShoppingBtn.innerHTML = `🛒 Закупки <span id="shopping-badge" class="tab-badge" style="${isDisp ? '' : 'display:none;'}">${cnt}</span>`;
+    }
     if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Завершені';
     if (viewAdminBtn) viewAdminBtn.innerHTML = '👑 Панель Адмін';
     if (addCarBtn) addCarBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Додати авто';
@@ -2528,6 +2948,8 @@ function translateDOM() {
     if (mobNotesLabel) mobNotesLabel.textContent = 'Нотатки';
     const mobTrashLabel = document.querySelector('#mob-nav-trash .mob-label');
     if (mobTrashLabel) mobTrashLabel.textContent = 'Сміття';
+    const mobShopLabel = document.querySelector('#mob-nav-shopping .mob-label');
+    if (mobShopLabel) mobShopLabel.textContent = 'Закупки';
     const mobArchiveLabel = document.querySelector('#mob-nav-archive .mob-label');
     if (mobArchiveLabel) mobArchiveLabel.textContent = 'Завершені';
 
