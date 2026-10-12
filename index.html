@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3.1">
+    <link rel="stylesheet" href="style.css?v=3.2">
 </head>
 
 <body class="light-theme">
@@ -111,6 +111,7 @@
                         <button id="view-notes" class="tab-btn">📝 Notatki</button>
                         <button id="view-trash" class="tab-btn">🗑️ Śmieci</button>
                         <button id="view-shopping" class="tab-btn">🛒 Zakupy <span id="shopping-badge" class="tab-badge" style="display:none;">0</span></button>
+                        <button id="view-attendance" class="tab-btn">⏱️ Obecność</button>
                         <button id="view-archive" class="tab-btn">📦 Zrealizowane</button>
                         <button id="view-admin" class="tab-btn">👑 Panel Admin</button>
                     </div>
@@ -143,14 +144,34 @@
             </section>
 
             <div id="archive-controls" class="archive-controls glass" style="display: none;">
-                <div class="period-filters">
-                    <button class="period-btn active" data-period="all">Wszystko</button>
-                    <button class="period-btn" data-period="month">Miesiąc</button>
-                    <button class="period-btn" data-period="3months">3 Miesiące</button>
+                <div class="archive-controls-top">
+                    <div class="period-filters">
+                        <button class="period-btn active" data-period="all">Wszystko</button>
+                        <button class="period-btn" data-period="month">Miesiąc</button>
+                        <button class="period-btn" data-period="3months">3 Miesiące</button>
+                    </div>
+                    <div class="archive-view-toggles">
+                        <button type="button" id="btn-toggle-archive-grouping" class="btn-secondary" title="Grupuj samochody według kategorii usług">
+                            📑 Widok: Usługi razem
+                        </button>
+                    </div>
+                    <div class="archive-stats">
+                        <span class="label">Suma w Zrealizowanych:</span>
+                        <span id="archive-total-value" class="val price-value">0,00 zł</span>
+                    </div>
                 </div>
-                <div class="archive-stats">
-                    <span class="label">Suma w Zrealizowanych:</span>
-                    <span id="archive-total-value" class="val price-value">0,00 zł</span>
+
+                <!-- Service Category Statistics Chips & Filters -->
+                <div class="archive-service-stats-container">
+                    <div class="archive-service-filters">
+                        <button class="archive-srv-chip active" data-category="all">Wszystkie usługi</button>
+                        <button class="archive-srv-chip" data-category="konserwacja">🛡️ Konserwacje <span id="stat-count-konserwacja" class="srv-badge">0</span></button>
+                        <button class="archive-srv-chip" data-category="ceramika">✨ Ceramiki <span id="stat-count-ceramika" class="srv-badge">0</span></button>
+                        <button class="archive-srv-chip" data-category="korekta">🚘 Korekty lakieru <span id="stat-count-korekta" class="srv-badge">0</span></button>
+                        <button class="archive-srv-chip" data-category="czyszczenie">🧼 Czyszczenie & Pranie <span id="stat-count-czyszczenie" class="srv-badge">0</span></button>
+                        <button class="archive-srv-chip" data-category="folie">🛡️ Folie PPF <span id="stat-count-folie" class="srv-badge">0</span></button>
+                        <button class="archive-srv-chip" data-category="inne">🔧 Inne <span id="stat-count-inne" class="srv-badge">0</span></button>
+                    </div>
                 </div>
             </div>
 
@@ -438,6 +459,164 @@
                 </div>
             </div>
 
+            <!-- Attendance Section (Lista Obecności i Czas Pracy) -->
+            <div id="attendance-section" class="attendance-section" style="display: none;">
+                <div class="section-title-bar glass" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2>⏱️ Lista Obecności i Czas Pracy</h2>
+                        <p class="subtitle">Rejestruj wejście i wyjście oraz przeglądaj miesięczną ewidencję obecności</p>
+                    </div>
+                    <div id="attendance-current-time-badge" class="time-badge glass">
+                        🕒 <span id="attendance-live-clock">--:--:--</span>
+                    </div>
+                </div>
+
+                <!-- Worker Daily Check-in Card (For current logged-in employee) -->
+                <div class="attendance-worker-hero glass-box">
+                    <div class="attendance-hero-header">
+                        <div>
+                            <span class="user-greeting">Pracownik: <strong id="attendance-user-display" style="color: var(--primary-green);">---</strong></span>
+                            <h3 id="attendance-today-date-str" style="margin: 4px 0 0 0;">Dzisiaj: --.--.----</h3>
+                        </div>
+                        <div id="attendance-today-status-badge" class="attendance-status-badge status-offline">
+                            🔴 Poza pracą
+                        </div>
+                    </div>
+
+                    <div class="attendance-action-container">
+                        <div class="attendance-time-stats">
+                            <div class="time-stat-box">
+                                <span class="label">Wejście do pracy:</span>
+                                <strong id="attendance-clock-in-time">--:--</strong>
+                            </div>
+                            <div class="time-stat-box">
+                                <span class="label">Wyjście z pracy:</span>
+                                <strong id="attendance-clock-out-time">--:--</strong>
+                            </div>
+                            <div class="time-stat-box">
+                                <span class="label">Czas dzisiejszy:</span>
+                                <strong id="attendance-today-duration" style="color: var(--primary-green);">0h 00m</strong>
+                            </div>
+                        </div>
+
+                        <div class="attendance-buttons-row">
+                            <button type="button" id="btn-clock-in" class="btn-primary btn-attendance-action clock-in">
+                                ▶️ ROZPOCZNIJ PRACĘ (Wejście)
+                            </button>
+                            <button type="button" id="btn-clock-out" class="btn-danger btn-attendance-action clock-out" style="display: none;">
+                                ⏹️ ZAKOŃCZ PRACĘ (Wyjście)
+                            </button>
+                        </div>
+
+                        <div class="attendance-note-input-row">
+                            <input type="text" id="attendance-daily-note" placeholder="Opcjonalna notatka do dzisiejszego dnia (np. nadgodziny, sobota, wyjazd)...">
+                            <button type="button" id="btn-save-attendance-note" class="btn-secondary" style="white-space: nowrap;">Zapisz notatkę</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Management Supervisor Live Board (For Tomek & Adrian/Admin) -->
+                <div id="attendance-manager-board" class="glass-box manager-only" style="margin-top: 25px; display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0;">👑 Podgląd na żywo dla Kierowników (Tomek & Adrian)</h3>
+                            <p class="subtitle" style="margin: 2px 0 0 0;">Dokładny podgląd kiedy pracownicy kliknęli wejście i wyjście</p>
+                        </div>
+                        <button type="button" id="btn-manual-attendance" class="btn-secondary">➕ Dodaj / Skoryguj wpis pracownika</button>
+                    </div>
+
+                    <!-- Live Status Grid for All Workers -->
+                    <div id="attendance-live-workers-grid" class="attendance-live-grid">
+                        <!-- Injected dynamically: cards showing worker, live status, exact click timestamps -->
+                    </div>
+                </div>
+
+                <!-- Monthly Attendance Timesheet (History & Archive) -->
+                <div class="attendance-monthly-card glass-box" style="margin-top: 25px;">
+                    <!-- Print-only Title & Header -->
+                    <div class="print-only-header">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.3rem; text-transform: uppercase;">Karta Ewidencji Czasu Pracy</h2>
+                                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #444;">EcoCarPro Auto Detailing</p>
+                            </div>
+                            <div style="text-align: right; font-size: 0.85rem;">
+                                <p style="margin: 0;"><strong>Okres:</strong> <span id="print-sheet-month">--</span></p>
+                                <p style="margin: 2px 0 0 0;"><strong>Pracownik:</strong> <span id="print-sheet-worker">--</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-monthly-header">
+                        <div>
+                            <h3 style="margin: 0;">📅 Ewidencja i Archiwum Miesięczne</h3>
+                            <p class="subtitle" style="margin: 2px 0 0 0;">Historia obecności dzień po dniu z podsumowaniem godzin</p>
+                        </div>
+                        <div class="attendance-filter-controls">
+                            <select id="attendance-month-select" class="form-select" style="min-width: 170px;">
+                                <!-- Months injected dynamically -->
+                            </select>
+                            <select id="attendance-worker-select" class="form-select manager-only" style="min-width: 170px; display: none;">
+                                <!-- Workers injected dynamically for managers -->
+                            </select>
+                            <button type="button" id="btn-print-attendance" class="btn-primary" title="Drukuj lub zapisz do PDF">
+                                🖨️ Drukuj / Pobierz Kartę
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Aggregated Statistics -->
+                    <div class="attendance-stats-bar glass">
+                        <div class="stat-item">
+                            <span class="label">Dni robocze:</span>
+                            <span id="att-stat-days" class="val">0 dni</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Suma godzin:</span>
+                            <span id="att-stat-hours" class="val">0h 00m</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Średnio na dzień:</span>
+                            <span id="att-stat-avg" class="val">0h 00m</span>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Table -->
+                    <div class="attendance-table-container">
+                        <table class="attendance-table">
+                            <thead>
+                                <tr>
+                                    <th>Dzień</th>
+                                    <th>Data</th>
+                                    <th class="att-col-worker manager-only" style="display: none;">Pracownik</th>
+                                    <th>Wejście (Klik)</th>
+                                    <th>Wyjście (Klik)</th>
+                                    <th>Łączny czas</th>
+                                    <th>Status</th>
+                                    <th>Uwagi</th>
+                                    <th class="manager-only att-actions-th" style="display: none;">Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-table-body">
+                                <!-- Injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Print-only Signatures Section -->
+                    <div class="print-only-signatures">
+                        <div class="signature-box">
+                            <div class="signature-line">...................................................</div>
+                            <strong>Podpis pracownika</strong>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line">...................................................</div>
+                            <strong>Zatwierdził pracodawca (Tomek / Adrian)</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Admin Section -->
             <div id="admin-section" class="admin-section" style="display: none;">
                 <!-- Account Creation Box for Tomek & Admin -->
@@ -513,6 +692,10 @@
                 <span class="mob-icon">🛒</span>
                 <span class="mob-label">Zakupy</span>
                 <span id="mob-shopping-badge" class="mob-notif-badge" style="display:none;">0</span>
+            </button>
+            <button id="mob-nav-attendance" class="mob-nav-item">
+                <span class="mob-icon">⏱️</span>
+                <span class="mob-label">Obecność</span>
             </button>
             <button id="mob-nav-archive" class="mob-nav-item">
                 <span class="mob-icon">📦</span>
@@ -892,6 +1075,47 @@
             </div>
         </div>
 
+        <!-- Modal for Manual Attendance Entry (Tomek & Adrian) -->
+        <div id="attendance-manual-modal" class="modal">
+            <div class="modal-content glass" style="max-width: 480px;">
+                <div class="modal-header">
+                    <h2>Korekta / Wpis Obecności</h2>
+                    <button type="button" id="close-attendance-modal" class="btn-close">&times;</button>
+                </div>
+                <form id="attendance-manual-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px;">
+                    <input type="hidden" id="manual-att-id">
+                    <div class="form-group">
+                        <label for="manual-att-worker">Pracownik:</label>
+                        <select id="manual-att-worker" class="form-select" required>
+                            <!-- Injected -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="manual-att-date">Data:</label>
+                        <input type="date" id="manual-att-date" required>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label for="manual-att-clock-in">Godzina wejścia:</label>
+                            <input type="time" id="manual-att-clock-in" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="manual-att-clock-out">Godzina wyjścia:</label>
+                            <input type="time" id="manual-att-clock-out">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="manual-att-note">Notatka / Powód korekty:</label>
+                        <input type="text" id="manual-att-note" placeholder="np. Zapomniany telefon, nadgodziny">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                        <button type="button" id="btn-cancel-manual-att" class="btn-secondary">Anuluj</button>
+                        <button type="submit" class="btn-primary">Zapisz obecność</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Help Modal -->
         <div id="help-modal" class="modal">
             <div class="modal-content glass help-content">
@@ -914,7 +1138,7 @@
 
     <div id="toast-container"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script type="module" src="app.js?v=3.1"></script>
+    <script type="module" src="app.js?v=3.2"></script>
 </body>
 
 </html>

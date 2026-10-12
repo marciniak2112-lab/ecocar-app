@@ -39,6 +39,7 @@ const archivedNotesCol = collection(db, 'archived_notes');
 const trashCol = collection(db, 'trash_schedule');
 const deletedUsersCol = collection(db, 'deleted_users');
 const shoppingCol = collection(db, 'shopping_items');
+const attendanceCol = collection(db, 'attendance');
 
 // State Management
 let cars = [];
@@ -49,9 +50,14 @@ let trashSchedule = [];
 let shoppingItems = [];
 let shoppingFilter = 'pending'; // 'pending' | 'bought'
 let shoppingSearchQuery = '';
+let attendanceRecords = [];
+let selectedAttendanceMonth = new Date().toISOString().slice(0, 7);
+let selectedAttendanceWorker = 'all';
+let archiveServiceCategory = 'all';
+let archiveGroupedView = false;
 let customUsers = [];
 let deletedUsers = [];
-let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'shopping', 'archive', 'admin'
+let currentView = 'active'; // 'active', 'locations', 'calendar', 'notes', 'trash', 'shopping', 'attendance', 'archive', 'admin'
 let currentUser = localStorage.getItem('ecoCarUser') || ''; // 'Admin', 'Tomek', 'Monia', 'Adam', 'Łukasz', 'Nastka'
 let archivePeriod = 'all'; // 'all', 'month', '3months'
 
@@ -77,12 +83,14 @@ function getCanonicalUsername(username) {
         .replace(/ż/g, 'z');
     if (canonical === 'tomasz') canonical = 'tomek';
     if (canonical === 'administrator') canonical = 'admin';
+    if (canonical === 'adrian') canonical = 'admin';
     return canonical;
 }
 
 // Default user passwords fallback
 const DEFAULT_PASSWORDS = {
     'admin': 'system02',
+    'adrian': 'system02',
     'tomek': 'tommar',
     'monia': 'wanda',
     'adam': '767211439',
@@ -198,25 +206,25 @@ async function changeUserPassword(username, newPassword) {
     }
 }
 
-// Helper: Check if user is Owner (Właściciel) - Admin, Tomek, Monia
+// Helper: Check if user is Owner (Właściciel) - Admin, Adrian, Tomek, Monia
 function isOwner(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
+    return u === 'admin' || u === 'adrian' || u === 'tomek' || u === 'tomasz' || u === 'monia' || u === 'monika';
 }
 
-// Helper: Check if user can add cars (Admin, Tomek, Łukasz)
+// Helper: Check if user can add cars (Admin, Adrian, Tomek, Łukasz)
 function canAddCars(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
+    return u === 'admin' || u === 'adrian' || u === 'tomek' || u === 'tomasz' || u === 'lukasz' || u === 'łukasz';
 }
 
-// Helper: Check if user can access Admin Panel and manage users (Admin & Tomek ONLY)
+// Helper: Check if user can access Admin Panel and manage users (Admin, Adrian & Tomek ONLY)
 function canManageLocationsAndUsers(user = currentUser) {
     if (!user) return false;
     const u = user.toLowerCase();
-    return u === 'admin' || u === 'tomek' || u === 'tomasz';
+    return u === 'admin' || u === 'adrian' || u === 'tomek' || u === 'tomasz';
 }
 
 // Helper: Check if user can view Zrealizowane / Archive tab (Owners & Łukasz)
@@ -259,6 +267,7 @@ const viewNotesBtn = document.getElementById('view-notes');
 const viewTrashBtn = document.getElementById('view-trash');
 const viewShoppingBtn = document.getElementById('view-shopping');
 const shoppingBadge = document.getElementById('shopping-badge');
+const viewAttendanceBtn = document.getElementById('view-attendance');
 const viewArchiveBtn = document.getElementById('view-archive');
 const viewAdminBtn = document.getElementById('view-admin');
 
@@ -270,6 +279,7 @@ const mobNavNotes = document.getElementById('mob-nav-notes');
 const mobNavTrash = document.getElementById('mob-nav-trash');
 const mobNavShopping = document.getElementById('mob-nav-shopping');
 const mobShoppingBadge = document.getElementById('mob-shopping-badge');
+const mobNavAttendance = document.getElementById('mob-nav-attendance');
 const mobNavArchive = document.getElementById('mob-nav-archive');
 const mobNavAdmin = document.getElementById('mob-nav-admin');
 const mobNavNotif = document.getElementById('mob-nav-notif');
@@ -287,6 +297,37 @@ const countShoppingPending = document.getElementById('count-shopping-pending');
 const countShoppingBought = document.getElementById('count-shopping-bought');
 const shoppingSearchInput = document.getElementById('shopping-search-input');
 const shoppingGrid = document.getElementById('shopping-grid');
+
+// Attendance Section Elements
+const attendanceSection = document.getElementById('attendance-section');
+const attendanceLiveClock = document.getElementById('attendance-live-clock');
+const attendanceUserDisplay = document.getElementById('attendance-user-display');
+const attendanceTodayDateStr = document.getElementById('attendance-today-date-str');
+const attendanceTodayStatusBadge = document.getElementById('attendance-today-status-badge');
+const attendanceClockInTime = document.getElementById('attendance-clock-in-time');
+const attendanceClockOutTime = document.getElementById('attendance-clock-out-time');
+const attendanceTodayDuration = document.getElementById('attendance-today-duration');
+const btnClockIn = document.getElementById('btn-clock-in');
+const btnClockOut = document.getElementById('btn-clock-out');
+const attendanceDailyNote = document.getElementById('attendance-daily-note');
+const btnSaveAttendanceNote = document.getElementById('btn-save-attendance-note');
+const attendanceManagerBoard = document.getElementById('attendance-manager-board');
+const attendanceLiveWorkersGrid = document.getElementById('attendance-live-workers-grid');
+const btnManualAttendance = document.getElementById('btn-manual-attendance');
+const attendanceMonthSelect = document.getElementById('attendance-month-select');
+const attendanceWorkerSelect = document.getElementById('attendance-worker-select');
+const btnPrintAttendance = document.getElementById('btn-print-attendance');
+const attStatDays = document.getElementById('att-stat-days');
+const attStatHours = document.getElementById('att-stat-hours');
+const attStatAvg = document.getElementById('att-stat-avg');
+const attendanceTableBody = document.getElementById('attendance-table-body');
+const attendanceManualModal = document.getElementById('attendance-manual-modal');
+const closeAttendanceModalBtn = document.getElementById('close-attendance-modal');
+const attendanceManualForm = document.getElementById('attendance-manual-form');
+const btnCancelManualAtt = document.getElementById('btn-cancel-manual-att');
+
+// Archive Grouping & Categorization Elements
+const btnToggleArchiveGrouping = document.getElementById('btn-toggle-archive-grouping');
 
 const adminSection = document.getElementById('admin-section');
 const logsList = document.getElementById('logs-list');
@@ -464,6 +505,15 @@ function init() {
         }
     });
 
+    // Attendance Realtime Listener
+    const attendanceQ = query(attendanceCol, orderBy('date', 'desc'), limit(500));
+    onSnapshot(attendanceQ, (snapshot) => {
+        attendanceRecords = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (currentView === 'attendance') {
+            renderAttendance();
+        }
+    });
+
     setInterval(updateCountdowns, 1000);
     setInterval(processAutoArchiving, 60000);
 
@@ -475,6 +525,9 @@ function init() {
 
     // Shopping Module Handlers
     setupShoppingModule();
+
+    // Attendance Module Handlers
+    setupAttendanceModule();
 
     // Account Creation Handlers
     setupAccountCreation();
@@ -528,6 +581,7 @@ function setupNavigation() {
         if (viewNotesBtn) viewNotesBtn.classList.toggle('active', targetView === 'notes');
         if (viewTrashBtn) viewTrashBtn.classList.toggle('active', targetView === 'trash');
         if (viewShoppingBtn) viewShoppingBtn.classList.toggle('active', targetView === 'shopping');
+        if (viewAttendanceBtn) viewAttendanceBtn.classList.toggle('active', targetView === 'attendance');
         viewArchiveBtn.classList.toggle('active', targetView === 'archive');
         viewAdminBtn.classList.toggle('active', targetView === 'admin');
 
@@ -538,6 +592,7 @@ function setupNavigation() {
         if (mobNavNotes) mobNavNotes.classList.toggle('active', targetView === 'notes');
         if (mobNavTrash) mobNavTrash.classList.toggle('active', targetView === 'trash');
         if (mobNavShopping) mobNavShopping.classList.toggle('active', targetView === 'shopping');
+        if (mobNavAttendance) mobNavAttendance.classList.toggle('active', targetView === 'attendance');
         mobNavArchive.classList.toggle('active', targetView === 'archive');
         mobNavAdmin.classList.toggle('active', targetView === 'admin');
 
@@ -548,6 +603,7 @@ function setupNavigation() {
         if (notesSection) notesSection.style.display = (targetView === 'notes') ? 'block' : 'none';
         if (trashSection) trashSection.style.display = (targetView === 'trash') ? 'block' : 'none';
         if (shoppingSection) shoppingSection.style.display = (targetView === 'shopping') ? 'block' : 'none';
+        if (attendanceSection) attendanceSection.style.display = (targetView === 'attendance') ? 'block' : 'none';
         adminSection.style.display = (targetView === 'admin') ? 'block' : 'none';
         archiveControls.style.display = (targetView === 'archive') ? 'flex' : 'none';
 
@@ -563,6 +619,8 @@ function setupNavigation() {
             renderTrashSchedule();
         } else if (targetView === 'shopping') {
             renderShopping();
+        } else if (targetView === 'attendance') {
+            renderAttendance();
         } else if (targetView === 'admin') {
             loadAdminData();
         }
@@ -574,6 +632,7 @@ function setupNavigation() {
     if (viewNotesBtn) viewNotesBtn.onclick = () => switchTab('notes');
     if (viewTrashBtn) viewTrashBtn.onclick = () => switchTab('trash');
     if (viewShoppingBtn) viewShoppingBtn.onclick = () => switchTab('shopping');
+    if (viewAttendanceBtn) viewAttendanceBtn.onclick = () => switchTab('attendance');
     viewArchiveBtn.onclick = () => switchTab('archive');
     viewAdminBtn.onclick = () => switchTab('admin');
 
@@ -583,6 +642,7 @@ function setupNavigation() {
     if (mobNavNotes) mobNavNotes.onclick = () => switchTab('notes');
     if (mobNavTrash) mobNavTrash.onclick = () => switchTab('trash');
     if (mobNavShopping) mobNavShopping.onclick = () => switchTab('shopping');
+    if (mobNavAttendance) mobNavAttendance.onclick = () => switchTab('attendance');
     mobNavArchive.onclick = () => switchTab('archive');
     mobNavAdmin.onclick = () => switchTab('admin');
 
@@ -594,6 +654,26 @@ function setupNavigation() {
             renderCars(searchInput.value);
         };
     });
+
+    // Archive Service Category Chips
+    document.querySelectorAll('.archive-srv-chip').forEach(chip => {
+        chip.onclick = () => {
+            document.querySelectorAll('.archive-srv-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            archiveServiceCategory = chip.dataset.category || 'all';
+            renderCars(searchInput.value);
+        };
+    });
+
+    // Archive Grouping Toggle
+    if (btnToggleArchiveGrouping) {
+        btnToggleArchiveGrouping.onclick = () => {
+            archiveGroupedView = !archiveGroupedView;
+            btnToggleArchiveGrouping.classList.toggle('active', archiveGroupedView);
+            btnToggleArchiveGrouping.textContent = archiveGroupedView ? '✅ Widok: Usługi pogrupowane' : '📑 Widok: Usługi razem';
+            renderCars(searchInput.value);
+        };
+    }
 }
 
 function setupLogin() {
@@ -966,6 +1046,21 @@ function updateUIForRole() {
     // Shopping tab: accessible to ALL users!
     if (viewShoppingBtn) viewShoppingBtn.style.display = 'block';
     if (mobNavShopping) mobNavShopping.style.display = 'flex';
+
+    // Attendance tab: accessible to ALL users!
+    if (viewAttendanceBtn) viewAttendanceBtn.style.display = 'block';
+    if (mobNavAttendance) mobNavAttendance.style.display = 'flex';
+
+    // Attendance Manager live board & worker selector visibility: only for Tomek & Adrian/Admin
+    if (attendanceManagerBoard) {
+        attendanceManagerBoard.style.display = canManage ? 'block' : 'none';
+    }
+    if (attendanceWorkerSelect) {
+        attendanceWorkerSelect.style.display = canManage ? 'inline-block' : 'none';
+    }
+    document.querySelectorAll('.att-col-worker, .att-actions-th, .att-actions-td').forEach(el => {
+        el.style.display = canManage ? '' : 'none';
+    });
 
     const accountBox = document.getElementById('account-creation-box');
     if (accountBox) {
@@ -1424,11 +1519,126 @@ function renderCars(filter = '') {
     translateDOM();
 }
 
+// Helper: Extract all service categories for a car
+function getCarServiceCategories(car) {
+    const texts = [];
+    if (car.todoTasks && Array.isArray(car.todoTasks)) {
+        car.todoTasks.forEach(t => {
+            if (typeof t === 'string') texts.push(t.toLowerCase());
+            else if (t && t.text) texts.push(t.text.toLowerCase());
+        });
+    }
+    if (car.todo && Array.isArray(car.todo)) {
+        car.todo.forEach(t => {
+            if (typeof t === 'string') texts.push(t.toLowerCase());
+            else if (t && t.text) texts.push(t.text.toLowerCase());
+        });
+    }
+    if (car.serviceName) {
+        texts.push(car.serviceName.toLowerCase());
+    }
+    const fullText = texts.join(' ');
+
+    const categories = new Set();
+    if (fullText.includes('konserwac') || fullText.includes('podwozi') || fullText.includes('antykoroz')) {
+        categories.add('konserwacja');
+    }
+    if (fullText.includes('ceramik') || fullText.includes('powłok') || fullText.includes('powlok') || fullText.includes('kwarc')) {
+        categories.add('ceramika');
+    }
+    if (fullText.includes('korekt') || fullText.includes('polerowan') || fullText.includes('one-step') || fullText.includes('lakier')) {
+        categories.add('korekta');
+    }
+    if (fullText.includes('czyszczen') || fullText.includes('prani') || fullText.includes('tapicerk') || fullText.includes('środk') || fullText.includes('srodk') || fullText.includes('detailing')) {
+        categories.add('czyszczenie');
+    }
+    if (fullText.includes('foli') || fullText.includes('ppf') || fullText.includes('klamk') || fullText.includes('progi') || fullText.includes('bagażnik') || fullText.includes('bagaznik')) {
+        categories.add('folie');
+    }
+    if (categories.size === 0) {
+        categories.add('inne');
+    }
+    return Array.from(categories);
+}
+
+const ARCHIVE_CATEGORIES_CONFIG = [
+    { key: 'konserwacja', title: '🛡️ Konserwacje Podwozia', desc: 'Zabezpieczenia antykorozyjne podwozia i profili' },
+    { key: 'ceramika', title: '✨ Powłoki Ceramiczne', desc: 'Aplikacja powłok ceramicznych i kwarcowych' },
+    { key: 'korekta', title: '🚘 Korekty & Polerowanie Lakieru', desc: 'One-step, wieloetapowe polerowanie i renowacja lakieru' },
+    { key: 'czyszczenie', title: '🧼 Czyszczenie Wnętrza & Detailing', desc: 'Pranie tapicerki, detailing wnętrza i impregnacja' },
+    { key: 'folie', title: '🛡️ Ochronne Folie PPF', desc: 'Oklejanie klamek, progów, bagażnika, lamp i zderzaków' },
+    { key: 'inne', title: '🔧 Inne Realizacje', desc: 'Pozostałe usługi warsztatowe' }
+];
+
+function renderArchiveRowHtml(car, isOwnerUser) {
+    const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : '---';
+    const tasksList = (car.todoTasks || car.todo || []).map(t => typeof t === 'string' ? t : t.text).filter(Boolean);
+    const servicesDoneText = tasksList.length > 0 ? tasksList.join(', ') : (car.serviceName || 'Brak wpisanych zadań');
+
+    return `
+        <div class="archive-row glass" data-id="${car.id}">
+            ${isOwnerUser ? `<span class="col owner">${car.ownerName || '---'} / ${car.ownerPhone || '---'}</span>` : ''}
+            <span class="col brand" style="font-weight:600;">${car.brand}</span>
+            <span class="col plates">${car.plateNum || '---'}</span>
+            ${!isOwnerUser ? `<span class="col tasks">${servicesDoneText}</span>` : ''}
+            <span class="col date">${isOwnerUser ? releaseDate : '📅 ' + releaseDate}</span>
+            ${isOwnerUser ? `
+            <span class="col actions">
+                <button class="btn-icon btn-report" data-id="${car.id}" title="Pobierz Raport">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                </button>
+                ${currentUser === 'Admin' ? `
+                <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+                ` : ''}
+            </span>
+            ` : ''}
+        </div>
+    `;
+}
+
 function renderArchiveRows(filteredCars) {
     const isOwnerUser = isOwner(currentUser);
     const sorted = [...filteredCars].sort((a, b) => new Date(b.statusChangeDate || b.dateAdded) - new Date(a.statusChangeDate || b.dateAdded));
 
-    const totalArchiveValue = filteredCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
+    // Calculate category counts across all filteredCars
+    const catCounts = {
+        konserwacja: 0,
+        ceramika: 0,
+        korekta: 0,
+        czyszczenie: 0,
+        folie: 0,
+        inne: 0
+    };
+    filteredCars.forEach(car => {
+        const cats = getCarServiceCategories(car);
+        cats.forEach(c => {
+            if (catCounts[c] !== undefined) catCounts[c]++;
+        });
+    });
+
+    const setBadge = (id, count) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = count;
+    };
+    setBadge('stat-count-konserwacja', catCounts.konserwacja);
+    setBadge('stat-count-ceramika', catCounts.ceramika);
+    setBadge('stat-count-korekta', catCounts.korekta);
+    setBadge('stat-count-czyszczenie', catCounts.czyszczenie);
+    setBadge('stat-count-folie', catCounts.folie);
+    setBadge('stat-count-inne', catCounts.inne);
+
+    // Filter by selected service category if not 'all'
+    let displayedCars = sorted;
+    if (archiveServiceCategory !== 'all') {
+        displayedCars = sorted.filter(car => getCarServiceCategories(car).includes(archiveServiceCategory));
+    }
+
+    const totalArchiveValue = displayedCars.reduce((sum, car) => sum + parseFloat(car.price || 0), 0);
     if (archiveTotalValueEl) {
         archiveTotalValueEl.textContent = formatCurrency(totalArchiveValue);
     }
@@ -1437,51 +1647,71 @@ function renderArchiveRows(filteredCars) {
         archiveStatsEl.style.display = isOwnerUser ? 'flex' : 'none';
     }
 
-    let html = `
-        <div class="archive-container">
-            <div class="archive-header glass">
-                ${isOwnerUser ? '<span class="col owner">Właściciel / Tel</span>' : ''}
-                <span class="col brand">Marka i Model</span>
-                <span class="col plates">Tablice</span>
-                ${!isOwnerUser ? '<span class="col tasks">Co było robione</span>' : ''}
-                <span class="col date">Data realizacji</span>
-                ${isOwnerUser ? '<span class="col actions">Akcje</span>' : ''}
-            </div>
-            <div class="archive-list">
-    `;
-
-    sorted.forEach(car => {
-        const releaseDate = car.statusChangeDate ? new Date(car.statusChangeDate).toLocaleDateString('pl-PL') : '---';
-        const tasksList = (car.todoTasks || car.todo || []).map(t => typeof t === 'string' ? t : t.text).filter(Boolean);
-        const servicesDoneText = tasksList.length > 0 ? tasksList.join(', ') : (car.serviceName || 'Brak wpisanych zadań');
-
-        html += `
-            <div class="archive-row glass" data-id="${car.id}">
-                ${isOwnerUser ? `<span class="col owner">${car.ownerName || '---'} / ${car.ownerPhone || '---'}</span>` : ''}
-                <span class="col brand" style="font-weight:600;">${car.brand}</span>
-                <span class="col plates">${car.plateNum || '---'}</span>
-                ${!isOwnerUser ? `<span class="col tasks">${servicesDoneText}</span>` : ''}
-                <span class="col date">${isOwnerUser ? releaseDate : '📅 ' + releaseDate}</span>
-                ${isOwnerUser ? `
-                <span class="col actions">
-                    <button class="btn-icon btn-report" data-id="${car.id}" title="Pobierz Raport">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    </button>
-                    ${currentUser === 'Admin' ? `
-                    <button class="btn-icon btn-edit" data-id="${car.id}" title="Edytuj">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </button>
-                    <button class="btn-icon btn-delete" data-id="${car.id}" title="Usuń">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
-                    ` : ''}
-                </span>
-                ` : ''}
+    if (displayedCars.length === 0) {
+        carsGrid.innerHTML = `
+            <div class="empty-state" style="padding: 3rem 1rem; text-align: center; color: var(--text-muted);">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
+                <h3 style="color: var(--text-color); margin-bottom: 0.25rem;">Brak pojazdów w tej kategorii</h3>
+                <p>Nie odnaleziono zrealizowanych aut dla wybranego filtra kategorii.</p>
             </div>
         `;
-    });
+        carsGrid.classList.remove('list-view');
+        return;
+    }
 
-    html += '</div></div>';
+    const tableHeaderHtml = `
+        <div class="archive-header glass">
+            ${isOwnerUser ? '<span class="col owner">Właściciel / Tel</span>' : ''}
+            <span class="col brand">Marka i Model</span>
+            <span class="col plates">Tablice</span>
+            ${!isOwnerUser ? '<span class="col tasks">Co było robione</span>' : ''}
+            <span class="col date">Data realizacji</span>
+            ${isOwnerUser ? '<span class="col actions">Akcje</span>' : ''}
+        </div>
+    `;
+
+    let html = '';
+
+    if (archiveGroupedView) {
+        // Grouped by Category View
+        html += '<div class="archive-container">';
+        ARCHIVE_CATEGORIES_CONFIG.forEach(catDef => {
+            if (archiveServiceCategory !== 'all' && archiveServiceCategory !== catDef.key) return;
+
+            const groupCars = displayedCars.filter(car => getCarServiceCategories(car).includes(catDef.key));
+            if (groupCars.length > 0) {
+                html += `
+                    <div class="archive-group-section" style="margin-bottom: 25px;">
+                        <div class="archive-group-header">
+                            <div class="group-title-left">
+                                <span class="group-title" style="font-size: 1.1rem; font-weight: 700;">${catDef.title}</span>
+                                <span class="group-desc" style="font-size: 0.8rem; color: var(--text-muted); margin-left: 8px;">${catDef.desc}</span>
+                            </div>
+                            <span class="group-count-badge srv-badge" style="font-size: 0.85rem; padding: 4px 10px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: var(--primary-green); font-weight: 700;">
+                                ${groupCars.length} ${groupCars.length === 1 ? 'auto' : (groupCars.length < 5 ? 'auta' : 'aut')}
+                            </span>
+                        </div>
+                        ${tableHeaderHtml}
+                        <div class="archive-list">
+                            ${groupCars.map(car => renderArchiveRowHtml(car, isOwnerUser)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        html += '</div>';
+    } else {
+        // Standard Flat List View
+        html = `
+            <div class="archive-container">
+                ${tableHeaderHtml}
+                <div class="archive-list">
+                    ${displayedCars.map(car => renderArchiveRowHtml(car, isOwnerUser)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     carsGrid.innerHTML = html;
     carsGrid.classList.add('list-view');
 }
@@ -2439,6 +2669,630 @@ function renderShopping() {
     });
 }
 
+// ==========================================
+// ATTENDANCE & WORKING HOURS MODULE
+// ==========================================
+
+function formatAttendanceDuration(minutes) {
+    if (!minutes || minutes <= 0) return '0h 00m';
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return `${h}h ${m < 10 ? '0' : ''}${m}m`;
+}
+
+function getTodayDateStr() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getTodayMonthStr() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+function getPolishDayOfWeek(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    const days = ['Niedz', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sob'];
+    return days[d.getDay()] || '';
+}
+
+function isWeekendDay(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay();
+    return day === 0 || day === 6;
+}
+
+function getPolishMonthName(monthStr) {
+    if (!monthStr) return '';
+    const parts = monthStr.split('-');
+    if (parts.length !== 2) return monthStr;
+    const year = parts[0];
+    const month = parts[1];
+    const monthNames = [
+        'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+        'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+    ];
+    const mIndex = parseInt(month, 10) - 1;
+    return `${monthNames[mIndex] || month} ${year}`;
+}
+
+function getAllActiveWorkersList() {
+    const defaultWorkers = ['Adam', 'Łukasz', 'Nastka', 'Monia'];
+    const list = [...defaultWorkers];
+    customUsers.forEach(u => {
+        if (u.username && !list.some(w => w.toLowerCase() === u.username.toLowerCase())) {
+            list.push(u.username);
+        }
+    });
+    return list.filter(w => !deletedUsers.includes(w.toLowerCase()));
+}
+
+function setupAttendanceModule() {
+    // Live Digital Clock
+    const updateClock = () => {
+        const now = new Date();
+        if (attendanceLiveClock) {
+            attendanceLiveClock.textContent = now.toLocaleTimeString('pl-PL');
+        }
+
+        // Dynamically update today's timer if currently active
+        if (currentView === 'attendance' && currentUser) {
+            const todayStr = getTodayDateStr();
+            const todayRec = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser) && r.status === 'active');
+            if (todayRec && todayRec.clockIn) {
+                const diffMin = Math.max(0, Math.floor((new Date() - new Date(todayRec.clockIn)) / 60000));
+                if (attendanceTodayDuration) {
+                    attendanceTodayDuration.textContent = formatAttendanceDuration(diffMin);
+                }
+            }
+        }
+    };
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Setup Month dropdown (current month and past 11 months)
+    if (attendanceMonthSelect) {
+        const curDate = new Date();
+        let optionsHtml = '';
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(curDate.getFullYear(), curDate.getMonth() - i, 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const val = `${y}-${m}`;
+            const label = getPolishMonthName(val);
+            optionsHtml += `<option value="${val}" ${i === 0 ? 'selected' : ''}>${label}</option>`;
+        }
+        attendanceMonthSelect.innerHTML = optionsHtml;
+        selectedAttendanceMonth = attendanceMonthSelect.value || getTodayMonthStr();
+
+        attendanceMonthSelect.onchange = () => {
+            selectedAttendanceMonth = attendanceMonthSelect.value;
+            renderAttendance();
+        };
+    }
+
+    // Setup Worker dropdown for managers
+    if (attendanceWorkerSelect) {
+        attendanceWorkerSelect.onchange = () => {
+            selectedAttendanceWorker = attendanceWorkerSelect.value;
+            renderAttendance();
+        };
+    }
+
+    // Clock In Button
+    if (btnClockIn) {
+        btnClockIn.onclick = async () => {
+            if (!currentUser) {
+                showToast("Musisz być zalogowany, aby zarejestrować obecność!", "error");
+                return;
+            }
+            const todayStr = getTodayDateStr();
+            const existing = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser));
+            if (existing && existing.status === 'completed') {
+                showToast("Praca na dzisiejszy dzień została już zakończona!", "warning");
+                return;
+            }
+            if (existing && existing.status === 'active') {
+                showToast("Jesteś już zarejestrowany jako obecny w pracy!", "info");
+                return;
+            }
+
+            const now = new Date();
+            const timeHHMM = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            const timeWithSec = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            try {
+                await addDoc(attendanceCol, {
+                    worker: currentUser,
+                    date: todayStr,
+                    clockIn: now.toISOString(),
+                    clockInTime: timeHHMM,
+                    clockInTimestamp: timeWithSec,
+                    clockOut: null,
+                    clockOutTime: null,
+                    clockOutTimestamp: null,
+                    durationMinutes: 0,
+                    status: 'active',
+                    note: ''
+                });
+                showToast(`Rozpoczęto pracę o ${timeWithSec}! Miłego dnia.`, "success");
+                logAction(`Pracownik ${currentUser} rozpoczął pracę o ${timeWithSec}`);
+                renderAttendance();
+            } catch (err) {
+                console.error("Błąd rejestracji wejścia:", err);
+                showToast("Błąd zapisu obecności", "error");
+            }
+        };
+    }
+
+    // Clock Out Button
+    if (btnClockOut) {
+        btnClockOut.onclick = async () => {
+            if (!currentUser) return;
+            const todayStr = getTodayDateStr();
+            const existing = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser) && r.status === 'active');
+            if (!existing) {
+                showToast("Nie znaleziono aktywnego wejścia do pracy!", "error");
+                return;
+            }
+
+            const confirmed = await showConfirm("Czy na pewno chcesz zakończyć dzień pracy?", "ZAKOŃCZ PRACĘ", "ANULUJ", true);
+            if (!confirmed) return;
+
+            const now = new Date();
+            const timeHHMM = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+            const timeWithSec = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const startMs = existing.clockIn ? new Date(existing.clockIn).getTime() : now.getTime();
+            const durationMin = Math.max(1, Math.round((now.getTime() - startMs) / 60000));
+
+            try {
+                await updateDoc(doc(db, 'attendance', existing.id), {
+                    clockOut: now.toISOString(),
+                    clockOutTime: timeHHMM,
+                    clockOutTimestamp: timeWithSec,
+                    durationMinutes: durationMin,
+                    status: 'completed'
+                });
+                const durStr = formatAttendanceDuration(durationMin);
+                showToast(`Zakończono pracę o ${timeWithSec}! Łącznie dzisiaj: ${durStr}`, "success");
+                logAction(`Pracownik ${currentUser} zakończył pracę o ${timeWithSec} (${durStr})`);
+                renderAttendance();
+            } catch (err) {
+                console.error("Błąd rejestracji wyjścia:", err);
+                showToast("Błąd zapisu wyjścia", "error");
+            }
+        };
+    }
+
+    // Daily Note Save Button
+    if (btnSaveAttendanceNote) {
+        btnSaveAttendanceNote.onclick = async () => {
+            const noteText = (attendanceDailyNote?.value || '').trim();
+            const todayStr = getTodayDateStr();
+            const existing = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser));
+            if (!existing) {
+                showToast("Najpierw kliknij Rozpocznij Pracę!", "warning");
+                return;
+            }
+            try {
+                await updateDoc(doc(db, 'attendance', existing.id), {
+                    note: noteText
+                });
+                showToast("Zapisano notatkę do dzisiejszego dnia!", "success");
+            } catch (err) {
+                console.error("Błąd zapisu notatki:", err);
+                showToast("Błąd zapisu notatki", "error");
+            }
+        };
+    }
+
+    // Print Timesheet Button
+    if (btnPrintAttendance) {
+        btnPrintAttendance.onclick = () => {
+            const monthLabel = getPolishMonthName(selectedAttendanceMonth);
+            const workerLabel = (selectedAttendanceWorker === 'all' || !canManageLocationsAndUsers(currentUser))
+                ? (canManageLocationsAndUsers(currentUser) ? 'Wszyscy pracownicy' : currentUser)
+                : selectedAttendanceWorker;
+
+            const printMonthEl = document.getElementById('print-sheet-month');
+            const printWorkerEl = document.getElementById('print-sheet-worker');
+            if (printMonthEl) printMonthEl.textContent = monthLabel;
+            if (printWorkerEl) printWorkerEl.textContent = workerLabel;
+
+            window.print();
+        };
+    }
+
+    // Manual Entry Button (Managers)
+    if (btnManualAttendance) {
+        btnManualAttendance.onclick = () => {
+            openManualAttendanceModal();
+        };
+    }
+
+    // Close Manual Modal
+    if (closeAttendanceModalBtn && attendanceManualModal) {
+        closeAttendanceModalBtn.onclick = () => {
+            attendanceManualModal.classList.remove('active');
+        };
+    }
+    if (btnCancelManualAtt && attendanceManualModal) {
+        btnCancelManualAtt.onclick = () => {
+            attendanceManualModal.classList.remove('active');
+        };
+    }
+
+    // Manual Form Submit
+    if (attendanceManualForm) {
+        attendanceManualForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('manual-att-id').value;
+            const worker = document.getElementById('manual-att-worker').value;
+            const date = document.getElementById('manual-att-date').value;
+            const clockInTime = document.getElementById('manual-att-clock-in').value;
+            const clockOutTime = document.getElementById('manual-att-clock-out').value;
+            const note = document.getElementById('manual-att-note').value.trim();
+
+            if (!worker || !date || !clockInTime) {
+                showToast("Wypełnij wymagane pola (pracownik, data, wejście)!", "error");
+                return;
+            }
+
+            let durationMinutes = 0;
+            let status = 'active';
+            if (clockOutTime) {
+                const [inH, inM] = clockInTime.split(':').map(Number);
+                const [outH, outM] = clockOutTime.split(':').map(Number);
+                durationMinutes = Math.max(0, (outH * 60 + outM) - (inH * 60 + inM));
+                status = 'completed';
+            }
+
+            const payload = {
+                worker: worker,
+                date: date,
+                clockInTime: clockInTime,
+                clockInTimestamp: clockInTime + ':00',
+                clockOutTime: clockOutTime || null,
+                clockOutTimestamp: clockOutTime ? clockOutTime + ':00' : null,
+                durationMinutes: durationMinutes,
+                status: status,
+                note: note || ''
+            };
+
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'attendance', id), payload);
+                    showToast(`Zaktualizowano wpis obecności dla: ${worker}`, "success");
+                    logAction(`Kierownik ${currentUser} skorygował obecność pracownika: ${worker} (${date})`);
+                } else {
+                    payload.clockIn = new Date(`${date}T${clockInTime}:00`).toISOString();
+                    if (clockOutTime) {
+                        payload.clockOut = new Date(`${date}T${clockOutTime}:00`).toISOString();
+                    }
+                    await addDoc(attendanceCol, payload);
+                    showToast(`Dodano ręczny wpis obecności dla: ${worker}`, "success");
+                    logAction(`Kierownik ${currentUser} dodał wpis obecności dla: ${worker} (${date})`);
+                }
+                attendanceManualModal.classList.remove('active');
+                renderAttendance();
+            } catch (err) {
+                console.error("Błąd zapisu ręcznej obecności:", err);
+                showToast("Błąd zapisu wpisu", "error");
+            }
+        };
+    }
+}
+
+function openManualAttendanceModal(existing = null) {
+    if (!attendanceManualModal) return;
+    const workerSelect = document.getElementById('manual-att-worker');
+    if (workerSelect) {
+        const workers = getAllActiveWorkersList();
+        workerSelect.innerHTML = workers.map(w => `<option value="${escapeHTML(w)}">${escapeHTML(w)}</option>`).join('');
+        if (existing?.worker) {
+            workerSelect.value = existing.worker;
+        }
+    }
+
+    document.getElementById('manual-att-id').value = existing?.id || '';
+    document.getElementById('manual-att-date').value = existing?.date || getTodayDateStr();
+    document.getElementById('manual-att-clock-in').value = existing?.clockInTime || '08:00';
+    document.getElementById('manual-att-clock-out').value = existing?.clockOutTime || '';
+    document.getElementById('manual-att-note').value = existing?.note || '';
+
+    attendanceManualModal.classList.add('active');
+}
+
+function renderAttendance() {
+    if (!attendanceSection) return;
+
+    const isManager = canManageLocationsAndUsers(currentUser);
+    const todayStr = getTodayDateStr();
+
+    // 1. Employee Hero Check-in Card
+    if (attendanceUserDisplay) {
+        attendanceUserDisplay.textContent = currentUser || 'Pracownik';
+    }
+    if (attendanceTodayDateStr) {
+        const dateObj = new Date();
+        const plDate = dateObj.toLocaleDateString('pl-PL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        attendanceTodayDateStr.textContent = `Dzisiaj: ${plDate.charAt(0).toUpperCase() + plDate.slice(1)}`;
+    }
+
+    const myTodayRec = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser));
+
+    if (!myTodayRec) {
+        // Not clocked in today
+        if (attendanceTodayStatusBadge) {
+            attendanceTodayStatusBadge.className = 'attendance-status-badge status-offline';
+            attendanceTodayStatusBadge.textContent = '🔴 Poza pracą';
+        }
+        if (attendanceClockInTime) attendanceClockInTime.textContent = '--:--';
+        if (attendanceClockOutTime) attendanceClockOutTime.textContent = '--:--';
+        if (attendanceTodayDuration) attendanceTodayDuration.textContent = '0h 00m';
+        if (btnClockIn) {
+            btnClockIn.style.display = 'inline-flex';
+            btnClockIn.disabled = false;
+            btnClockIn.innerHTML = '▶️ ROZPOCZNIJ PRACĘ (Wejście)';
+        }
+        if (btnClockOut) btnClockOut.style.display = 'none';
+        if (attendanceDailyNote) attendanceDailyNote.value = '';
+    } else if (myTodayRec.status === 'active') {
+        // Currently working
+        if (attendanceTodayStatusBadge) {
+            attendanceTodayStatusBadge.className = 'attendance-status-badge status-active';
+            attendanceTodayStatusBadge.textContent = '🟢 W pracy';
+        }
+        if (attendanceClockInTime) attendanceClockInTime.textContent = myTodayRec.clockInTime || '--:--';
+        if (attendanceClockOutTime) attendanceClockOutTime.textContent = '--:--';
+
+        const diffMin = Math.max(0, Math.floor((new Date() - new Date(myTodayRec.clockIn || Date.now())) / 60000));
+        if (attendanceTodayDuration) attendanceTodayDuration.textContent = formatAttendanceDuration(diffMin);
+
+        if (btnClockIn) btnClockIn.style.display = 'none';
+        if (btnClockOut) {
+            btnClockOut.style.display = 'inline-flex';
+            btnClockOut.disabled = false;
+            btnClockOut.innerHTML = '⏹️ ZAKOŃCZ PRACĘ (Wyjście)';
+        }
+        if (attendanceDailyNote) attendanceDailyNote.value = myTodayRec.note || '';
+    } else {
+        // Completed work today
+        if (attendanceTodayStatusBadge) {
+            attendanceTodayStatusBadge.className = 'attendance-status-badge status-completed';
+            attendanceTodayStatusBadge.textContent = '⚪ Zakończono';
+        }
+        if (attendanceClockInTime) attendanceClockInTime.textContent = myTodayRec.clockInTime || '--:--';
+        if (attendanceClockOutTime) attendanceClockOutTime.textContent = myTodayRec.clockOutTime || '--:--';
+        if (attendanceTodayDuration) attendanceTodayDuration.textContent = formatAttendanceDuration(myTodayRec.durationMinutes || 0);
+
+        if (btnClockIn) {
+            btnClockIn.style.display = 'inline-flex';
+            btnClockIn.disabled = true;
+            btnClockIn.innerHTML = '✅ Praca na dziś zakończona';
+        }
+        if (btnClockOut) btnClockOut.style.display = 'none';
+        if (attendanceDailyNote) attendanceDailyNote.value = myTodayRec.note || '';
+    }
+
+    // 2. Supervisor Live Board (For Tomek & Adrian)
+    if (attendanceManagerBoard) {
+        attendanceManagerBoard.style.display = isManager ? 'block' : 'none';
+    }
+
+    if (isManager && attendanceLiveWorkersGrid) {
+        const workers = getAllActiveWorkersList();
+        attendanceLiveWorkersGrid.innerHTML = workers.map(worker => {
+            const wRec = attendanceRecords.find(r => r.date === todayStr && getCanonicalUsername(r.worker) === getCanonicalUsername(worker));
+            const isActive = wRec && wRec.status === 'active';
+            const isCompleted = wRec && wRec.status === 'completed';
+
+            let cardClass = 'live-worker-card is-offline';
+            let statusBadge = '<span class="attendance-status-badge status-offline">🔴 Nieobecny</span>';
+            let clickDetails = '<span>Brak zarejestrowanego kliknięcia dzisiaj</span>';
+
+            if (isActive) {
+                cardClass = 'live-worker-card is-active';
+                statusBadge = '<span class="attendance-status-badge status-active">🟢 W pracy</span>';
+                const diffMin = Math.max(0, Math.floor((new Date() - new Date(wRec.clockIn || Date.now())) / 60000));
+                clickDetails = `
+                    <span>Kliknięto wejście: <strong>${wRec.clockInTimestamp || wRec.clockInTime || '---'}</strong></span>
+                    <span>Czas na stanowisku: <strong style="color:var(--primary-green);">${formatAttendanceDuration(diffMin)}</strong></span>
+                `;
+            } else if (isCompleted) {
+                cardClass = 'live-worker-card is-completed';
+                statusBadge = '<span class="attendance-status-badge status-completed">⚪ Zakończył</span>';
+                clickDetails = `
+                    <span>Wejście: <strong>${wRec.clockInTimestamp || wRec.clockInTime || '---'}</strong></span>
+                    <span>Wyjście: <strong>${wRec.clockOutTimestamp || wRec.clockOutTime || '---'}</strong></span>
+                    <span>Łączny czas: <strong>${formatAttendanceDuration(wRec.durationMinutes || 0)}</strong></span>
+                `;
+            }
+
+            const initial = (worker || '?').charAt(0).toUpperCase();
+
+            return `
+                <div class="${cardClass}">
+                    <div class="live-worker-header">
+                        <div class="live-worker-info">
+                            <div class="live-worker-avatar">${initial}</div>
+                            <span class="live-worker-name">${escapeHTML(worker)}</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="live-click-info">
+                        ${clickDetails}
+                        ${wRec?.note ? `<span style="color:var(--text-color); font-style:italic;">📝 ${escapeHTML(wRec.note)}</span>` : ''}
+                    </div>
+                    <button type="button" class="btn-secondary btn-edit-live-worker" data-worker="${escapeHTML(worker)}" data-recid="${wRec?.id || ''}" style="margin-top:6px; font-size:0.75rem; padding:4px 8px; width:100%;">
+                        ✏️ Skoryguj / Wpisz godziny
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        // Attach listeners for live edit buttons
+        attendanceLiveWorkersGrid.querySelectorAll('.btn-edit-live-worker').forEach(btn => {
+            btn.onclick = () => {
+                const w = btn.dataset.worker;
+                const recId = btn.dataset.recid;
+                const existing = recId ? attendanceRecords.find(r => r.id === recId) : { worker: w, date: todayStr };
+                openManualAttendanceModal(existing);
+            };
+        });
+    }
+
+    // 3. Worker Dropdown for Managers
+    if (attendanceWorkerSelect) {
+        attendanceWorkerSelect.style.display = isManager ? 'inline-block' : 'none';
+        if (attendanceWorkerSelect.children.length === 0 || attendanceWorkerSelect.dataset.populated !== 'true') {
+            const workers = getAllActiveWorkersList();
+            let opts = '<option value="all">👥 Wszyscy pracownicy</option>';
+            workers.forEach(w => {
+                opts += `<option value="${escapeHTML(w)}" ${selectedAttendanceWorker === w ? 'selected' : ''}>👤 ${escapeHTML(w)}</option>`;
+            });
+            attendanceWorkerSelect.innerHTML = opts;
+            attendanceWorkerSelect.dataset.populated = 'true';
+        }
+    }
+
+    // 4. Monthly Attendance Timesheet Table & Stats
+    if (!attendanceTableBody) return;
+
+    // Filter by selected month
+    let monthRecords = attendanceRecords.filter(r => r.date && r.date.startsWith(selectedAttendanceMonth));
+
+    // Filter by worker
+    if (!isManager) {
+        // Regular worker only sees their own entries!
+        monthRecords = monthRecords.filter(r => getCanonicalUsername(r.worker) === getCanonicalUsername(currentUser));
+    } else if (selectedAttendanceWorker !== 'all') {
+        monthRecords = monthRecords.filter(r => getCanonicalUsername(r.worker) === getCanonicalUsername(selectedAttendanceWorker));
+    }
+
+    // Sort by date descending, then clockIn descending
+    monthRecords.sort((a, b) => {
+        if (b.date !== a.date) return b.date.localeCompare(a.date);
+        return (b.clockIn || '').localeCompare(a.clockIn || '');
+    });
+
+    // Calculate aggregated stats
+    const totalMinutes = monthRecords.reduce((sum, r) => sum + (parseInt(r.durationMinutes, 10) || 0), 0);
+    const uniqueDays = new Set(monthRecords.map(r => r.date)).size;
+    const workDaysCount = (selectedAttendanceWorker === 'all' && isManager) ? monthRecords.length : uniqueDays;
+    const avgMinutes = workDaysCount > 0 ? Math.round(totalMinutes / workDaysCount) : 0;
+
+    if (attStatDays) attStatDays.textContent = `${workDaysCount} ${workDaysCount === 1 ? 'dzień' : 'dni'}`;
+    if (attStatHours) attStatHours.textContent = formatAttendanceDuration(totalMinutes);
+    if (attStatAvg) attStatAvg.textContent = formatAttendanceDuration(avgMinutes);
+
+    // Update Print Header Details
+    const printMonthEl = document.getElementById('print-sheet-month');
+    const printWorkerEl = document.getElementById('print-sheet-worker');
+    if (printMonthEl) printMonthEl.textContent = getPolishMonthName(selectedAttendanceMonth);
+    if (printWorkerEl) {
+        printWorkerEl.textContent = (selectedAttendanceWorker === 'all' || !isManager)
+            ? (isManager ? 'Wszyscy pracownicy' : currentUser)
+            : selectedAttendanceWorker;
+    }
+
+    // Render Table Rows
+    if (monthRecords.length === 0) {
+        attendanceTableBody.innerHTML = `
+            <tr>
+                <td colspan="${isManager ? 9 : 7}" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    Brak wpisów obecności w wybranym miesiącu (${getPolishMonthName(selectedAttendanceMonth)}).
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    attendanceTableBody.innerHTML = monthRecords.map(rec => {
+        const dayName = getPolishDayOfWeek(rec.date);
+        const weekend = isWeekendDay(rec.date);
+        const isRecActive = rec.status === 'active';
+
+        // Format Date: DD.MM.YYYY
+        let dateFormatted = rec.date || '---';
+        if (rec.date && rec.date.includes('-')) {
+            const [y, m, d] = rec.date.split('-');
+            dateFormatted = `${d}.${m}.${y}`;
+        }
+
+        const clockInDisplay = rec.clockInTimestamp || rec.clockInTime || '---';
+        const clockOutDisplay = rec.clockOutTimestamp || rec.clockOutTime || '---';
+        const durFormatted = isRecActive ? '⏱️ W trakcie' : formatAttendanceDuration(rec.durationMinutes || 0);
+
+        return `
+            <tr class="${weekend ? 'att-weekend' : ''}" data-id="${rec.id}">
+                <td class="att-day-name">${dayName}</td>
+                <td>${dateFormatted}</td>
+                ${isManager ? `<td class="att-col-worker" style="font-weight:600;">${escapeHTML(rec.worker || '---')}</td>` : ''}
+                <td>${clockInDisplay}</td>
+                <td>${clockOutDisplay}</td>
+                <td style="font-weight:700; color: ${isRecActive ? '#f59e0b' : 'var(--primary-green)'};">${durFormatted}</td>
+                <td>
+                    <span class="${isRecActive ? 'att-badge-active' : 'att-badge-ok'}">
+                        ${isRecActive ? '🟢 W pracy' : '✅ Zakończono'}
+                    </span>
+                </td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHTML(rec.note || '')}">
+                    ${escapeHTML(rec.note || '---')}
+                </td>
+                ${isManager ? `
+                <td class="att-actions-td">
+                    <button type="button" class="btn-icon btn-edit-att" data-id="${rec.id}" title="Edytuj wpis">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button type="button" class="btn-icon btn-delete-att" data-id="${rec.id}" title="Usuń wpis">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>
+                ` : ''}
+            </tr>
+        `;
+    }).join('');
+
+    // Attach manager edit and delete listeners to table rows
+    if (isManager) {
+        attendanceTableBody.querySelectorAll('.btn-edit-att').forEach(btn => {
+            btn.onclick = () => {
+                const id = btn.dataset.id;
+                const rec = attendanceRecords.find(r => r.id === id);
+                if (rec) openManualAttendanceModal(rec);
+            };
+        });
+
+        attendanceTableBody.querySelectorAll('.btn-delete-att').forEach(btn => {
+            btn.onclick = async () => {
+                const id = btn.dataset.id;
+                const rec = attendanceRecords.find(r => r.id === id);
+                const info = rec ? `${rec.worker} (${rec.date})` : 'ten wpis';
+                const confirmed = await showConfirm(`Czy na pewno chcesz usunąć wpis obecności dla: ${info}?`, "USUŃ", "ANULUJ", true);
+                if (confirmed) {
+                    try {
+                        await deleteDoc(doc(db, 'attendance', id));
+                        showToast("Usunięto wpis obecności", "success");
+                        logAction(`Kierownik ${currentUser} usunął wpis obecności dla: ${info}`);
+                        renderAttendance();
+                    } catch (err) {
+                        console.error("Błąd usuwania obecności:", err);
+                        showToast("Błąd usuwania wpisu", "error");
+                    }
+                }
+            };
+        });
+    }
+}
+
 // Account Creation Logic for Tomek & Admin
 function setupAccountCreation() {
     const accountBox = document.getElementById('account-creation-box');
@@ -2920,6 +3774,9 @@ function translateDOM() {
         }
         const mobShopLabel = document.querySelector('#mob-nav-shopping .mob-label');
         if (mobShopLabel) mobShopLabel.textContent = 'Zakupy';
+        if (viewAttendanceBtn) viewAttendanceBtn.innerHTML = '⏱️ Obecność';
+        const mobAttLabel = document.querySelector('#mob-nav-attendance .mob-label');
+        if (mobAttLabel) mobAttLabel.textContent = 'Obecność';
         return;
     }
 
@@ -2934,6 +3791,7 @@ function translateDOM() {
         const isDisp = b && b.style.display !== 'none';
         viewShoppingBtn.innerHTML = `🛒 Закупки <span id="shopping-badge" class="tab-badge" style="${isDisp ? '' : 'display:none;'}">${cnt}</span>`;
     }
+    if (viewAttendanceBtn) viewAttendanceBtn.innerHTML = '⏱️ Відвідуваність';
     if (viewArchiveBtn) viewArchiveBtn.innerHTML = '📦 Завершені';
     if (viewAdminBtn) viewAdminBtn.innerHTML = '👑 Панель Адмін';
     if (addCarBtn) addCarBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Додати авто';
@@ -2950,6 +3808,8 @@ function translateDOM() {
     if (mobTrashLabel) mobTrashLabel.textContent = 'Сміття';
     const mobShopLabel = document.querySelector('#mob-nav-shopping .mob-label');
     if (mobShopLabel) mobShopLabel.textContent = 'Закупки';
+    const mobAttLabel = document.querySelector('#mob-nav-attendance .mob-label');
+    if (mobAttLabel) mobAttLabel.textContent = 'Відвідуваність';
     const mobArchiveLabel = document.querySelector('#mob-nav-archive .mob-label');
     if (mobArchiveLabel) mobArchiveLabel.textContent = 'Завершені';
 
